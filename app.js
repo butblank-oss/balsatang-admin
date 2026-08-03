@@ -93,9 +93,83 @@ function renderNav(){
       ${ico(n.ico,15)}${n.label}${b?`<span class="dot">${b}</span>`:''}</button>`;
   }).join('');
 }
+/* ── 좁은 화면 서랍 ──
+   사이드바가 190px 고정이라 폰에서 본문이 200px 로 눌렸다. 제목이 한 글자씩
+   세로로 떨어지고 iframe 안 화면이 읽히지 않았다. 좁으면 서랍으로 뺀다. */
+function closeSide(){ el('side').classList.remove('open'); el('sideDim').classList.remove('on'); }
+el('burger').onclick = () => {
+  const on = el('side').classList.toggle('open');
+  el('sideDim').classList.toggle('on', on);
+};
+el('sideDim').onclick = closeSide;
+
+/* ── 토큰 ──
+   예전에는 안쪽 화면(사료 관리·가격·심사)이 각자 prompt() 로 물었다. 폰에서
+   iframe 안 prompt 는 붙여넣기가 고약하고, 세 화면이 따로 조르는 것처럼 보였다.
+   실은 같은 도메인 같은 열쇠라 한 번이면 되는데 그게 안 읽혔다. 여기서 받는다. */
+const TOKEN_KEY = 'balsatang.gh.token';
+function tokenNow(){ try{ return localStorage.getItem(TOKEN_KEY) || ''; }catch(e){ return ''; } }
+function openToken(){
+  const cur = tokenNow();
+  showModal(`<div class="modal" style="max-width:560px">
+    <div class="modal-h"><b>GitHub 토큰</b>
+      <p>사료를 고쳐 커밋하려면 필요해요. <b>이 브라우저에만</b> 저장되고 저장소엔 들어가지 않아요.
+         폰과 PC 는 저장소가 따로라 기기마다 한 번씩 넣어야 합니다.<br>
+         Fine-grained 토큰 · 저장소는 <b>butblank-oss/balsatang</b> 하나만 ·
+         권한은 <b>Contents: Read and write</b> · 기한은 짧게(90일).
+         조직 토큰이나 classic 토큰은 쓰지 마세요.</p></div>
+    <div style="padding:0 2px">
+      <input id="tokIn" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"
+        placeholder="github_pat_…" value="${esc(cur)}"
+        style="width:100%;padding:12px;border-radius:8px;border:1px solid var(--line);
+               background:var(--panel2);color:var(--ink);font-size:16px;font-family:ui-monospace,monospace">
+      <label style="display:flex;align-items:center;justify-content:flex-start;gap:7px;margin-top:10px;
+             font-size:12px;color:var(--sub);cursor:pointer">
+        <input type="checkbox" id="tokShow" style="width:16px;height:16px;flex:none"><span>입력한 값 보기</span></label>
+      <div id="tokMsg" style="margin-top:10px;font-size:12.5px;min-height:18px"></div>
+    </div>
+    <div class="modal-f">
+      <button class="btn" onclick="tryCloseModal()">닫기</button>
+      ${cur ? `<button class="btn" id="tokDel">지우기</button>` : ''}
+      <div style="flex:1"></div>
+      <button class="btn pri" id="tokSave">확인하고 저장</button>
+    </div>
+  </div>`);
+
+  el('tokShow').onchange = e => { el('tokIn').type = e.target.checked ? 'text' : 'password'; };
+  const del = document.getElementById('tokDel');
+  if (del) del.onclick = () => { localStorage.removeItem(TOKEN_KEY); tryCloseModal(); toast('토큰을 지웠어요'); go(page); };
+
+  el('tokSave').onclick = async () => {
+    const v = el('tokIn').value.trim();
+    const msg = el('tokMsg');
+    if (!v) { msg.style.color = 'var(--bad)'; msg.textContent = '토큰을 붙여넣어 주세요.'; return; }
+    msg.style.color = 'var(--sub)'; msg.textContent = '권한을 확인하는 중…';
+    try {
+      /* 저장하기 전에 진짜 쓰기 권한이 있는지 물어본다. 넣어만 두면 커밋할 때
+         실패하는데, 그때는 이미 고친 내용을 들고 있는 상태라 늦다. */
+      const r = await fetch('https://api.github.com/repos/butblank-oss/balsatang', {
+        headers: { Authorization: 'Bearer ' + v, Accept: 'application/vnd.github+json' } });
+      if (!r.ok) throw new Error(r.status === 401 ? '토큰이 잘못됐어요' : `GitHub 응답 ${r.status}`);
+      const j = await r.json();
+      if (!j.permissions?.push)
+        throw new Error('쓰기 권한이 없는 토큰이에요 — Contents: Read and write 로 다시 만들어 주세요');
+      localStorage.setItem(TOKEN_KEY, v);
+      tryCloseModal();
+      toast('토큰을 저장했어요');
+      go(page);                       /* 보고 있던 화면을 새 토큰으로 다시 띄운다 */
+    } catch (e) {
+      msg.style.color = 'var(--bad)';
+      msg.textContent = e.message;
+    }
+  };
+}
+
 function go(k, arg){
   page = k;
   el('pgTitle').textContent = TITLES[k] || '';
+  el('tokenBtn').textContent = tokenNow() ? '토큰 ✓' : '토큰';
+  closeSide();
   renderNav();
   if(EMBED[k]){ pgEmbed(k); el('wrap').scrollTop = 0; return; }
   ({dash:pgDash, ingr:pgIngr, tags:pgTags, recall:pgRecall,

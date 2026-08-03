@@ -60,8 +60,27 @@ svg.i{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke
   background:#ffffff1a;font-size:11.5px;font-weight:700;cursor:pointer}
 .topbar{display:flex;align-items:center;gap:10px;padding:16px 22px;border-bottom:1px solid var(--line);
   position:sticky;top:0;background:var(--bg);z-index:30}
-.topbar h1{font-size:15px;font-weight:800;letter-spacing:-.3px;flex:1}
+.topbar h1{font-size:15px;font-weight:800;letter-spacing:-.3px;flex:1;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .wrap{flex:1;padding:22px;overflow-y:auto}
+.topbar .burger{display:none;padding:8px 11px;font-size:15px;line-height:1}
+
+/* ── 좁은 화면 ──
+   사이드바가 190px 고정이라 390px 폰에서 본문이 200px 로 눌렸다. 제목이 한 글자씩
+   세로로 떨어지고 iframe 안이 읽히지 않았다. 좁으면 사이드바를 서랍으로 뺀다. */
+@media (max-width:760px){
+  #side{position:fixed;left:0;top:0;z-index:60;transform:translateX(-100%);
+    transition:transform .22s cubic-bezier(.4,0,.2,1);box-shadow:0 0 40px rgba(0,0,0,.6)}
+  #side.open{transform:none}
+  #sideDim{position:fixed;inset:0;z-index:55;background:rgba(0,0,0,.55);display:none}
+  #sideDim.on{display:block}
+  .topbar .burger{display:inline-flex}
+  .topbar .sm-hide{display:none}
+  .topbar .btn{padding:8px 10px;font-size:12px}
+  .topbar{padding:12px 14px;gap:7px}
+  .wrap{padding:14px}
+  .grid2{grid-template-columns:1fr}
+}
 .page{display:none}
 .page.on{display:block;animation:fade .2s ease both}
 @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
@@ -246,6 +265,8 @@ select.inp{cursor:pointer;appearance:none;
 .modal-h{margin-bottom:18px}
 .modal-h b{display:flex;align-items:center;gap:7px;font-size:15px;font-weight:800;letter-spacing:-.3px}
 .modal-h p{margin-top:5px;font-size:11px;color:var(--muted);line-height:1.55}
+/* 제목의 b 는 flex 인데, 본문 문장 안의 b 까지 블록으로 떨어져 나갔다. 안에서는 그냥 굵게. */
+.modal-h p b{display:inline;font-size:inherit;font-weight:700;color:var(--ink2)}
 .modal-f{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
 .warnbox{margin-top:14px;padding:12px 14px;background:var(--bad-soft);border:1px solid #5A2126;
   border-radius:var(--r);font-size:11px;line-height:1.8;color:#FF9AA1}
@@ -300,14 +321,17 @@ select.inp{cursor:pointer;appearance:none;
     <button onclick="openRecall()">리콜 등록 →</button>
   </div>
   <header class="topbar">
+    <button class="btn burger" id="burger" aria-label="메뉴">☰</button>
     <h1 id="pgTitle">대시보드</h1>
-    <button class="btn" onclick="openRecall()">🚨 리콜 등록</button>
+    <button class="btn" id="tokenBtn" onclick="openToken()">토큰</button>
+    <button class="btn sm-hide" onclick="openRecall()">🚨 리콜 등록</button>
     <button class="btn pri" onclick="newFood()">+ 사료 등록</button>
-    <button class="btn" id="exportBtn" onclick="openExport()">내보내기<span id="dirtyDot"></span></button>
+    <button class="btn sm-hide" id="exportBtn" onclick="openExport()">내보내기<span id="dirtyDot"></span></button>
   </header>
   <div class="wrap" id="wrap"></div>
 </div>
 
+<div id="sideDim"></div>
 <div id="ov" onclick="if(event.target===this)tryCloseModal()"><div id="ovBody"></div></div>
 <div id="toast"></div>
 

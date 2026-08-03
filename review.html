@@ -629,8 +629,12 @@ async function loadReview(){
       return JSON.parse(f.text);
     }catch(e){ console.warn('저장소에서 읽지 못해 배포본으로 넘어갑니다', e); }
   }
+  /* 예전엔 어드민이 앱과 같은 저장소 안(…/balsatang/admin/)에 있어서 ../../ 로 닿았다.
+     지금은 admin.balsatang.com 이라 그 경로가 루트 위로 올라가 버린다 — 404 가 났다.
+     데이터는 앱 도메인에 있으므로 APP_BASE 를 거쳐 읽는다. */
+  const base = window.APP_BASE || '../../';
   let last;
-  for(const p of ['../../data/staging/review.json','../../data/staging/_review.json']){
+  for(const p of [base+'data/staging/review.json', base+'data/staging/_review.json']){
     try{
       const r=await fetch(p,{cache:'no-store'});
       if(r.ok) return r.json();
@@ -701,8 +705,8 @@ loadReview()
     document.getElementById('meta').textContent='불러오기 실패';
     document.getElementById('wrap').innerHTML=
       `<div class="empty"><b>심사 데이터를 불러오지 못했습니다</b>
-       <code>data/staging/_review.json</code> 이 없습니다.<br><br>
-       <code>node scripts/build-review.mjs</code> 를 실행하면 생성됩니다.<br>
+       ${esc(window.APP_BASE || '')}data/staging/review.json 을 읽지 못했어요.<br><br>
+       토큰을 넣으면 저장소에서 곧바로 읽습니다 — 배포를 기다리지 않아도 돼요.<br>
        <span style="color:var(--muted);font-size:12px">(${esc(err.message)})</span></div>`;
   });
 </script>
