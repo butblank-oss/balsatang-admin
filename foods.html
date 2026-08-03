@@ -63,31 +63,22 @@ td.num{font-variant-numeric:tabular-nums;text-align:right}
 .pill.no{background:var(--bad-soft);border-color:var(--bad);color:#FCA5A5}
 .pill.wa{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
 
-/* 편집 창. 오른쪽 서랍(560px)으로는 아홉 구역을 넣기에 좁아서
-   가운데 큰 창으로 바꿨다. 넓은 화면에서는 본문을 두 단으로 펼친다. */
-.panel{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:2vh 2vw;
-  opacity:0;pointer-events:none;transition:opacity .18s var(--t)}
-.panel.on{opacity:1;pointer-events:auto}
-.panel .box{width:min(1180px,96vw);height:min(94vh,1000px);background:var(--panel);
-  border:1px solid var(--line2);border-radius:var(--r-lg);display:flex;flex-direction:column;
-  overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.5);transform:translateY(10px) scale(.995);
-  transition:transform .2s var(--t)}
-.panel.on .box{transform:none}
-.panel .ph{padding:15px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;
-  background:var(--panel2)}
-.panel .pb{flex:1;overflow-y:auto;padding:20px 22px;
-  column-count:2;column-gap:28px;column-rule:1px solid var(--line)}
-/* 구역이 단 경계에서 잘리지 않게 */
-.panel .pb > *{break-inside:avoid}
-.panel .pf{padding:13px 20px;border-top:1px solid var(--line);display:flex;gap:8px;background:var(--panel2)}
-@media (max-width:900px){
-  .panel{padding:0}
-  .panel .box{width:100%;height:100%;border-radius:0;border:0}
-  .panel .pb{column-count:1}
-}
-.dim{position:fixed;inset:0;z-index:35;background:rgba(0,0,0,.62);opacity:0;pointer-events:none;
-  transition:opacity .25s}
-.dim.on{opacity:1;pointer-events:auto}
+/* 편집은 팝업이 아니라 페이지 전환이다.
+
+   서랍(560px)은 좁았고, 큰 팝업에 2단을 넣었더니 고정 높이 컨테이너에서
+   단이 가로로 흘러 가로 스크롤이 생겼다(column-count 의 성질이다).
+   화면을 통째로 바꾸면 그 문제가 아예 없어지고, 잘못 눌러 닫힐 일도 없다. */
+.edit-head{position:sticky;top:0;z-index:15;display:flex;align-items:center;gap:12px;
+  padding:14px 0 13px;margin-bottom:16px;background:var(--bg);border-bottom:1px solid var(--line)}
+.edit-head h2{font-size:17px;font-weight:700;letter-spacing:-.02em;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.edit-head .br{font-size:12px;color:var(--sub)}
+
+/* 구역을 벽돌처럼 나열한다. 넓으면 옆으로, 좁으면 아래로 — 가로로 넘치지 않는다. */
+.edit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));
+  gap:14px;align-items:start}
+.edit-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px 18px}
+.edit-card.wide{grid-column:1/-1}
 
 .f{margin-bottom:14px}
 .f label{display:block;font-size:11.5px;font-weight:600;color:var(--sub);margin-bottom:5px}
@@ -155,22 +146,6 @@ td.num{font-variant-numeric:tabular-nums;text-align:right}
     <div class="c" id="count"></div>
     <button class="btn" id="revert">되돌리기</button>
     <button class="btn pri" id="commit">GitHub 에 커밋</button>
-  </div>
-</div>
-
-<div class="dim" id="dim"></div>
-<div class="panel" id="panel">
-  <div class="box">
-    <div class="ph"><b id="panelTitle" style="font-size:15px"></b><div style="flex:1"></div>
-      <button class="btn" id="panelClose">닫기</button></div>
-    <div class="pb" id="panelBody"></div>
-    <div class="pf">
-      <button class="btn" id="panelReset">이 사료 되돌리기</button>
-      <span style="font-size:11.5px;color:var(--muted);align-self:center;margin-left:4px">
-        닫아도 고친 내용은 남아요 · 아래 <b style="color:var(--sub)">GitHub 에 커밋</b>을 눌러야 반영돼요</span>
-      <div style="flex:1"></div>
-      <button class="btn pri" id="panelDone">적용</button>
-    </div>
   </div>
 </div>
 

@@ -45,7 +45,8 @@ const S = {
   foods: [], detail: {},
   orig: new Map(),    // id → 원본 food JSON 문자열
   origDetail: new Map(),
-  cur: null,          // 패널에서 편집 중인 food
+  cur: null,          // 편집 중인 food (있으면 화면이 편집 페이지)
+  listScroll: 0,      // 목록으로 돌아왔을 때 보던 자리
   q: '', filter: 'all'
 };
 
@@ -149,6 +150,8 @@ function visible() {
    붙잡았다가 도로 꽂아도 소용없다 — 떨어지는 순간 브라우저가 한글 조합을
    취소해서 자모가 흩어진다. 그래서 바는 한 번만 그리고 목록만 갈아끼운다. */
 function render() {
+  /* 편집 중이면 화면을 통째로 편집 페이지로 바꾼다. 팝업이 아니다. */
+  if (S.cur) { renderEditor(); return; }
   if (!$('#bar')) {
     $('#wrap').innerHTML = `
       <div class="note">사료를 고치는 곳이에요. <b>커밋하면 몇 분 뒤 사이트에 그대로 반영돼요.</b>
@@ -229,17 +232,47 @@ function openPanel(id) {
   const f = S.foods.find(x => x.id === id);
   if (!f) return;
   S.cur = f;
-  $('#panelTitle').textContent = `${f.brand} ${f.name}`;
-  $('#panelBody').innerHTML = panelHtml(f);
-  bindPanel(f);
-  $('#panel').classList.add('on');
-  $('#dim').classList.add('on');
+  S.listScroll = window.scrollY;
+  render();
+  window.scrollTo(0, 0);
 }
 function closePanel() {
   S.cur = null;
-  $('#panel').classList.remove('on');
-  $('#dim').classList.remove('on');
+  $('#wrap').innerHTML = '';     /* 목록 껍데기를 다시 짓게 한다 */
   render();
+  window.scrollTo(0, S.listScroll || 0);
+}
+
+/* 편집 페이지 */
+function renderEditor() {
+  const f = S.cur;
+  $('#wrap').innerHTML = `
+    <div class="edit-head">
+      <button class="btn" data-back>← 목록</button>
+      <div style="min-width:0">
+        <div class="br">${esc(f.brand)}</div>
+        <h2>${esc(f.name)}</h2>
+      </div>
+      <div style="flex:1"></div>
+      <span style="font-size:11.5px;color:var(--muted)">고친 내용은 아래 <b style="color:var(--sub)">GitHub 에 커밋</b>을 눌러야 반영돼요</span>
+      <button class="btn" data-reset>이 사료 되돌리기</button>
+    </div>
+    <div id="panelBody"></div>`;
+  $('#panelBody').innerHTML = panelHtml(f);
+  bindPanel(f);
+  $('[data-back]').onclick = closePanel;
+  $('[data-reset]').onclick = () => {
+    if (!confirm('이 사료의 수정을 전부 되돌릴까요?')) return;
+    const o = JSON.parse(S.orig.get(f.id));
+    for (const k of Object.keys(f)) if (!(k in o)) delete f[k];
+    Object.assign(f, o);
+    const od = S.origDetail.get(f.id);
+    if (od) S.detail[f.id] = JSON.parse(od); else delete S.detail[f.id];
+    closePanel();
+  };
+  const dl = dirtyList();
+  $('#dock').hidden = dl.length === 0;
+  $('#count').innerHTML = `<b>${dl.length}건</b> 수정함 — ${dl.map(x => esc(x.name)).slice(0, 3).join(', ')}${dl.length > 3 ? ' 외' : ''}`;
 }
 
 function panelHtml(f) {
@@ -271,68 +304,71 @@ function panelHtml(f) {
       <div class="was">${changed ? `원래: ${esc((o[k] || []).map(x => dict[x] || x).join(', ') || '없음')}` : ''}</div></div>`;
   };
 
-  return `
-  <div class="sect" style="margin-top:0">기본 정보</div>
-  <div class="grid2">${FIELDS.map(field).join('')}</div>
-  ${multi('ages', AGE_KO)}${multi('sizes', SIZE_KO)}
+  const card = (title, body, wide) =>
+    `<section class="edit-card${wide ? ' wide' : ''}">
+       <div class="sect" style="margin-top:0">${title}</div>${body}</section>`;
 
-  <div class="sect">썸네일</div>
-  <div style="display:flex;gap:12px;align-items:center">
-    <div style="width:84px;height:84px;border-radius:10px;background:#fff;display:grid;place-items:center;overflow:hidden">
-      ${hasThumb(f) ? `<img src="${esc(f.thumb)}" style="max-width:100%;max-height:100%;object-fit:contain">`
-      : `<span style="color:#5B5B5B;font-size:11px">없음</span>`}</div>
-    <div style="flex:1;color:var(--sub);font-size:11.5px;line-height:1.6">
-      사료 봉지 사진이어야 해요. 브랜드 로고나 다른 제품 사진이면 사용자가 헷갈려요.
-      URL 을 바꾸고 <b style="color:var(--ink2)">적용</b>을 누르면 위 미리보기가 갱신돼요.</div>
-  </div>
+  return `<div class="edit-grid">
+  ${card('기본 정보', `<div class="grid2">${FIELDS.map(field).join('')}</div>
+    ${multi('ages', AGE_KO)}${multi('sizes', SIZE_KO)}`)}
 
-  <div class="sect">대표 가격 <span style="font-weight:500;color:var(--muted)">— 목록·카드에 쓰는 값</span></div>
-  <div class="grid2">
-    ${field({ k: 'price.p', label: '가격 (원)', num: true })}
-    ${field({ k: 'price.wg', label: '용량 (g)', num: true })}
-    ${field({ k: 'price.shop', label: '판매처', sel: SHOP_KO })}
-    ${field({ k: 'price.buyUrl', label: '구매 링크', wide: true, hint: '쿠팡 파트너스 링크 (link.coupang.com)' })}
-  </div>
-  <div class="derived" id="derived"></div>
+  ${card('썸네일', `
+    <div style="display:flex;gap:12px;align-items:center">
+      <div style="width:84px;height:84px;border-radius:10px;background:#fff;display:grid;place-items:center;overflow:hidden;flex-shrink:0">
+        ${hasThumb(f) ? `<img src="${esc(f.thumb)}" style="max-width:100%;max-height:100%;object-fit:contain">`
+        : `<span style="color:#5B5B5B;font-size:11px">없음</span>`}</div>
+      <div style="flex:1;min-width:0;color:var(--sub);font-size:11.5px;line-height:1.6">
+        사료 봉지 사진이어야 해요. 브랜드 로고나 다른 제품 사진이면 사용자가 헷갈려요.
+        위 <b style="color:var(--ink2)">기본 정보</b>의 썸네일 URL 을 바꾸면 갱신돼요.</div>
+    </div>`)}
 
-  <div class="sect">판매처별 가격 <span style="font-weight:500;color:var(--muted)">— 상세 화면 최저가 비교</span></div>
-  <div id="prices">${prices.map(priceRow).join('') || '<div class="was" style="color:var(--muted)">등록된 행이 없어요. 대표 가격이 대신 보여요.</div>'}</div>
-  <button class="btn" data-addprice style="margin-top:8px">행 추가</button>
+  ${card('대표 가격 <span style="font-weight:500;color:var(--muted)">— 목록·카드에 쓰는 값</span>', `
+    <div class="grid2">
+      ${field({ k: 'price.p', label: '가격 (원)', num: true })}
+      ${field({ k: 'price.wg', label: '용량 (g)', num: true })}
+      ${field({ k: 'price.shop', label: '판매처', sel: SHOP_KO })}
+      ${field({ k: 'price.buyUrl', label: '구매 링크', wide: true, hint: '쿠팡 파트너스 링크 (link.coupang.com)' })}
+    </div>
+    <div class="derived" id="derived"></div>`)}
 
-  <div class="sect">보장성분표 <span style="font-weight:500;color:var(--muted)">— 봉지에 적힌 값 그대로</span></div>
-  <div class="grid2">
-    ${nut('protein', '조단백 (%)')}${nut('fat', '조지방 (%)')}
-    ${nut('fiber', '조섬유 (%)')}${nut('moisture', '수분 (%)')}
-    ${nut('ash', '조회분 (%)')}${nut('meat', '생육 함량 (%)')}
-  </div>
-  <div class="derived" id="nutOut"></div>
+  ${card('판매처별 가격 <span style="font-weight:500;color:var(--muted)">— 상세 화면 최저가 비교</span>', `
+    <div id="prices">${prices.map(priceRow).join('') || '<div class="was" style="color:var(--muted)">등록된 행이 없어요. 대표 가격이 대신 보여요.</div>'}</div>
+    <button class="btn" data-addprice style="margin-top:8px">행 추가</button>`)}
 
-  <div class="sect">원료 <span style="font-weight:500;color:var(--muted)">— 표기 순서 그대로, 한 줄에 하나</span></div>
-  <textarea id="ingrText" style="width:100%;min-height:130px;padding:9px 11px;border-radius:var(--r);
-    background:var(--panel2);border:1px solid var(--line);font-size:13px;line-height:1.7;resize:vertical"
-    placeholder="닭고기\n현미\n닭기름\n…">${esc((d.ingr || []).map(i => i.name).join('\n'))}</textarea>
-  <div class="derived" id="ingrOut" style="margin-top:8px"></div>
+  ${card('보장성분표 <span style="font-weight:500;color:var(--muted)">— 봉지에 적힌 값 그대로</span>', `
+    <div class="grid2">
+      ${nut('protein', '조단백 (%)')}${nut('fat', '조지방 (%)')}
+      ${nut('fiber', '조섬유 (%)')}${nut('moisture', '수분 (%)')}
+      ${nut('ash', '조회분 (%)')}${nut('meat', '생육 함량 (%)')}
+    </div>
+    <div class="derived" id="nutOut"></div>`)}
 
-  <div class="sect">소비자 요약 카드
-    <span style="font-weight:500;color:var(--muted)">— 앱 상세에 그대로 보이는 문장</span></div>
-  <div style="display:flex;gap:6px;margin-bottom:9px;flex-wrap:wrap">
-    <button class="btn" data-vauto>사실에서 자동 생성</button>
-    <button class="btn" data-vadd>템플릿에서 고르기</button>
-  </div>
-  <div id="verdictList"></div>
+  ${card('원료 <span style="font-weight:500;color:var(--muted)">— 표기 순서 그대로, 한 줄에 하나</span>', `
+    <textarea id="ingrText" style="width:100%;min-height:180px;padding:9px 11px;border-radius:var(--r);
+      background:var(--panel2);border:1px solid var(--line);font-size:13px;line-height:1.7;resize:vertical"
+      placeholder="닭고기&#10;현미&#10;닭기름&#10;…">${esc((d.ingr || []).map(i => i.name).join('\n'))}</textarea>
+    <div class="derived" id="ingrOut" style="margin-top:8px"></div>`)}
 
-  <div class="sect">맞춤 태그
-    <span style="font-weight:500;color:var(--muted)">— 고르면 문장이 채워져요. 그 자리에서 고칠 수 있어요</span></div>
-  <div style="font-size:11.5px;font-weight:700;color:var(--good);margin-bottom:7px">이런 아이에게 잘 맞아요</div>
-  <div id="fitChips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px"></div>
-  <div id="fitRows"></div>
-  <div style="font-size:11.5px;font-weight:700;color:var(--warn);margin:16px 0 7px">이런 경우 주의해요</div>
-  <div id="cauChips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px"></div>
-  <div id="cauRows"></div>
+  ${card('별점 <span style="font-weight:500;color:var(--muted)">— 루브릭이 계산해요. 직접 못 고쳐요</span>', `
+    <div class="derived" id="rateOut"></div>`)}
 
-  <div class="sect">별점 <span style="font-weight:500;color:var(--muted)">— 루브릭이 계산해요. 직접 못 고쳐요</span></div>
-  <div class="derived" id="rateOut"></div>`;
+  ${card('소비자 요약 카드 <span style="font-weight:500;color:var(--muted)">— 앱 상세에 그대로 보이는 문장</span>', `
+    <div style="display:flex;gap:6px;margin-bottom:9px;flex-wrap:wrap">
+      <button class="btn" data-vauto>사실에서 자동 생성</button>
+      <button class="btn" data-vadd>템플릿에서 고르기</button>
+    </div>
+    <div id="verdictList"></div>`, true)}
+
+  ${card('맞춤 태그 <span style="font-weight:500;color:var(--muted)">— 고르면 문장이 채워져요. 그 자리에서 고칠 수 있어요</span>', `
+    <div style="font-size:11.5px;font-weight:700;color:var(--good);margin-bottom:7px">이런 아이에게 잘 맞아요</div>
+    <div id="fitChips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px"></div>
+    <div id="fitRows"></div>
+    <div style="font-size:11.5px;font-weight:700;color:var(--warn);margin:18px 0 7px">이런 경우 주의해요</div>
+    <div id="cauChips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px"></div>
+    <div id="cauRows"></div>`, true)}
+  </div>`;
 }
+
 
 /* 보장성분표 한 칸. 값은 DETAIL.nutrient 에 바로 들어간다. */
 function nutField(f, k, label) {
@@ -862,27 +898,6 @@ async function boot() {
 }
 
 $('#tokenBtn').onclick = askToken;
-$('#panelClose').onclick = closePanel;
-$('#panelDone').onclick = closePanel;
-/* 바깥을 눌렀다고 바로 닫지 않는다. 큰 창이라 여백이 넓어서 실수로 누르기 쉽다.
-   고친 게 없으면 그냥 닫고, 있으면 물어본다. */
-function tryClosePanel() {
-  const f = S.cur;
-  if (f && isDirty(f) && !confirm('이 사료에서 고친 내용이 있어요. 편집 창을 닫을까요?\n\n(닫아도 고친 내용은 남아 있어요. 아래 GitHub 에 커밋을 눌러야 반영돼요.)')) return;
-  closePanel();
-}
-$('#dim').onclick = tryClosePanel;
-$('#panel').onclick = e => { if (e.target === $('#panel')) tryClosePanel(); };
-$('#panelReset').onclick = () => {
-  const f = S.cur;
-  if (!f) return;
-  if (!confirm('이 사료의 수정을 전부 되돌릴까요?')) return;
-  Object.assign(f, JSON.parse(S.orig.get(f.id)));
-  for (const k of Object.keys(f)) if (!(k in JSON.parse(S.orig.get(f.id)))) delete f[k];
-  const od = S.origDetail.get(f.id);
-  if (od) S.detail[f.id] = JSON.parse(od);
-  closePanel();
-};
 $('#revert').onclick = () => {
   if (!confirm('수정한 내용을 전부 되돌릴까요?')) return;
   S.foods = S.foods.map(f => JSON.parse(S.orig.get(f.id)));
@@ -890,7 +905,8 @@ $('#revert').onclick = () => {
   render();
 };
 $('#commit').onclick = commit;
-addEventListener('keydown', e => { if (e.key === 'Escape' && S.cur) tryClosePanel(); });
+/* 페이지 전환이라 실수로 닫힐 일이 없다. Escape 는 목록으로 돌아가는 지름길. */
+addEventListener('keydown', e => { if (e.key === 'Escape' && S.cur) closePanel(); });
 addEventListener('beforeunload', e => { if (dirtyList().length) { e.preventDefault(); e.returnValue = ''; } });
 
 boot();
