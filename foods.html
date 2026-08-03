@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>발사탕 · 사료 관리</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+:root{
+  --bg:#0D0F14; --panel:#151922; --panel2:#1B2029; --line:#252B38; --line2:#333B4D;
+  /* 어두운 배경에서 읽히는 최소선. muted #5A6376 은 2.7~3.2:1,
+     sub #7C8698 은 4.5:1 언저리라 작은 글자가 안 읽혔다. 한 단계씩 밝혔다. */
+  --ink:#E8EBF0; --ink2:#B4BCCB; --sub:#949FB3; --muted:#838DA3;
+  --pri:#2F6FED; --pri-d:#245BC9; --pri-soft:#16233D;
+  --good:#22C55E; --good-soft:#0F2A1A; --warn:#F59E0B; --warn-soft:#2A2010;
+  --bad:#EF4444; --bad-soft:#2A1315;
+  --r:8px; --r-lg:12px; --t:.16s cubic-bezier(.4,0,.2,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'Pretendard',-apple-system,sans-serif;
+  font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;padding-bottom:80px}
+button,input,select,textarea{font:inherit;color:inherit;border:0;background:none}
+button{cursor:pointer}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+a{color:var(--pri-ink);text-decoration:none}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:5px;border:2px solid var(--bg)}
+
+.top{position:sticky;top:0;z-index:20;background:rgba(13,15,20,.94);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--line);padding:13px 18px;display:flex;align-items:center;gap:12px}
+.top h1{font-size:16px;font-weight:700;letter-spacing:-.02em}
+.top .meta{color:var(--sub);font-size:12px}
+.wrap{max-width:1080px;margin:0 auto;padding:18px}
+
+.btn{height:34px;padding:0 13px;border-radius:var(--r);font-size:12.5px;font-weight:600;
+  background:var(--panel2);color:var(--ink2);border:1px solid var(--line);transition:all var(--t)}
+.btn:hover{border-color:var(--line2);color:var(--ink)}
+.btn.pri{background:var(--pri);border-color:var(--pri);color:#fff}
+.btn.pri:hover{background:var(--pri-d)}
+.btn.ok{background:var(--good-soft);border-color:var(--good);color:var(--good)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.search{flex:1;min-width:180px;height:34px;padding:0 12px;border-radius:var(--r);
+  background:var(--panel2);border:1px solid var(--line)}
+.chip{height:28px;padding:0 11px;border-radius:99px;font-size:12px;font-weight:600;
+  background:var(--panel2);border:1px solid var(--line);color:var(--sub)}
+.chip.on{background:var(--pri-soft);border-color:var(--pri);color:#9DBBF5}
+
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{color:var(--sub);font-size:11px;font-weight:600;position:sticky;top:51px;background:var(--bg);z-index:10}
+tr.edited td{background:var(--warn-soft)}
+td.num{font-variant-numeric:tabular-nums;text-align:right}
+.thumb{width:38px;height:38px;border-radius:7px;background:#fff;object-fit:contain;display:block}
+.thumb.none{background:var(--panel2);display:grid;place-items:center;color:var(--muted);font-size:11px}
+.nm{font-weight:600}
+.br{color:var(--sub);font-size:11.5px}
+.pill{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:99px;
+  font-size:10.5px;font-weight:700;border:1px solid}
+.pill.ok{background:var(--good-soft);border-color:var(--good);color:var(--good)}
+.pill.no{background:var(--bad-soft);border-color:var(--bad);color:#FCA5A5}
+.pill.wa{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
+
+.panel{position:fixed;top:0;right:0;bottom:0;width:min(560px,100%);z-index:40;background:var(--panel);
+  border-left:1px solid var(--line);transform:translateX(100%);transition:transform .25s var(--t);
+  display:flex;flex-direction:column}
+.panel.on{transform:none}
+.panel .ph{padding:15px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.panel .pb{flex:1;overflow-y:auto;padding:18px}
+.panel .pf{padding:13px 18px;border-top:1px solid var(--line);display:flex;gap:8px}
+.dim{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.5);opacity:0;pointer-events:none;
+  transition:opacity .25s}
+.dim.on{opacity:1;pointer-events:auto}
+
+.f{margin-bottom:14px}
+.f label{display:block;font-size:11.5px;font-weight:600;color:var(--sub);margin-bottom:5px}
+.f input,.f select,.f textarea{width:100%;padding:9px 11px;border-radius:var(--r);
+  background:var(--panel2);border:1px solid var(--line);font-size:13px}
+.f input:focus,.f select:focus,.f textarea:focus{outline:none;border-color:var(--pri)}
+.f textarea{min-height:96px;line-height:1.6;resize:vertical}
+.f.ch input,.f.ch select,.f.ch textarea{border-color:var(--warn);background:var(--warn-soft)}
+.f .was{font-size:10.5px;color:var(--warn);margin-top:4px;min-height:13px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+.sect{font-size:12px;font-weight:700;color:var(--sub);letter-spacing:.03em;
+  margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.derived{background:var(--panel2);border:1px solid var(--line);border-radius:var(--r);
+  padding:11px 13px;font-size:12px;color:var(--ink2);line-height:1.7}
+.derived b{color:var(--ink)}
+
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:25;background:rgba(21,25,34,.97);
+  backdrop-filter:blur(10px);border-top:1px solid var(--line);padding:12px 18px}
+.dock .in{max-width:1080px;margin:0 auto;display:flex;gap:10px;align-items:center}
+.dock .c{flex:1;font-size:12px;color:var(--sub)}
+.dock .c b{color:var(--ink)}
+
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:82px;z-index:60;background:var(--ink);
+  color:var(--bg);padding:10px 18px;border-radius:99px;font-size:13px;font-weight:600;opacity:0;
+  transition:opacity var(--t);pointer-events:none;max-width:80%}
+.toast.on{opacity:1}
+.toast.err{background:var(--bad);color:#fff}
+
+.empty{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty b{display:block;color:var(--sub);font-size:15px;margin-bottom:8px}
+.note{background:var(--pri-soft);border:1px solid #23386b;border-radius:var(--r);padding:11px 13px;
+  font-size:12px;color:#9DBBF5;line-height:1.6;margin-bottom:14px}
+.note.warn{background:var(--warn-soft);border-color:#4a3a16;color:#FCD34D}
+
+/* 템플릿 고르기 시트 */
+#sheet{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.55);display:none}
+#sheet.on{display:block}
+#sheet .sh-in{position:absolute;right:0;top:0;bottom:0;width:min(460px,100%);background:var(--panel);
+  border-left:1px solid var(--line);display:flex;flex-direction:column}
+#sheet .sh-h{padding:15px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+#sheet .sh-h b{flex:1;font-size:15px}
+#sheet .sh-b{flex:1;overflow-y:auto;padding:16px}
+
+/* 어드민 안에 끼워 넣었을 때는 이 화면의 이동 링크를 감춘다.
+   왼쪽에 이미 메뉴가 있어서 두 벌이 되면 헷갈린다. */
+@media all { .embedded .top a { display:none !important } }
+</style>
+</head>
+<body>
+<script>if(window.top!==window.self)document.documentElement.classList.add('embedded');</script>
+
+<div class="top">
+  <h1>사료 관리</h1>
+  <div class="meta" id="meta">불러오는 중…</div>
+  <div style="flex:1"></div>
+  <button class="btn" id="tokenBtn">토큰</button>
+  <a class="btn" href="review.html" style="display:inline-flex;align-items:center">심사 화면</a>
+  <a class="btn" href="index.html" style="display:inline-flex;align-items:center">어드민</a>
+</div>
+
+<div class="wrap" id="wrap"></div>
+
+<div class="dock" hidden id="dock">
+  <div class="in">
+    <div class="c" id="count"></div>
+    <button class="btn" id="revert">되돌리기</button>
+    <button class="btn pri" id="commit">GitHub 에 커밋</button>
+  </div>
+</div>
+
+<div class="dim" id="dim"></div>
+<div class="panel" id="panel">
+  <div class="ph"><b id="panelTitle" style="font-size:15px"></b><div style="flex:1"></div>
+    <button class="btn" id="panelClose">닫기</button></div>
+  <div class="pb" id="panelBody"></div>
+  <div class="pf">
+    <button class="btn" id="panelReset">이 사료 되돌리기</button>
+    <div style="flex:1"></div>
+    <button class="btn pri" id="panelDone">적용</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* 앱(balsatang.com)에 있는 것을 그대로 읽는다 — 채점 로직·원료 사전·문구 템플릿.
+   여기에 옮겨 적으면 두 벌이 되어 반드시 어긋난다.
+   GitHub Pages 가 CORS 를 열어 둬서 다른 도메인에서도 읽을 수 있다.
+   로컬에서 볼 때는 localStorage 에 balsatang.appBase 를 넣어 딴 곳을 보게 할 수 있다. */
+window.APP_BASE = (function () {
+  try { var o = localStorage.getItem('balsatang.appBase'); if (o) return o; } catch (e) { }
+  return /(^|\.)balsatang\.com$/.test(location.hostname) ? 'https://balsatang.com/' : '../app/';
+})();
+document.write(['engine/dict.js', 'engine/phrases.js', 'engine/engine.js']
+  .map(function (f) { return '<scr' + 'ipt src="' + window.APP_BASE + f + '"><\/scr' + 'ipt>'; }).join(''));
+</script>
+<script src="github.js"></script>
+<script src="foods.js"></script>
+</body>
+</html>
