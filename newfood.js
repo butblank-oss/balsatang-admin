@@ -29,7 +29,7 @@ const NEWFOOD = {
       brand: '', name: '', brandSlug: '', country: 'KR', type: 'dry', rx: false,
       ages: ['adult'], sizes: ['all'],
       ga: { protein: '', fat: '', fiber: '', moisture: '', ash: '' },
-      ingredients: '',
+      kcal100: '', meat: '', thumb: '', ingredients: '', priceLines: '',
       price: { p: '', wg: '', shop: 'coupang', wgOptions: '', buyUrl: '' },
       specOrigin: 'domestic',
       srcKind: 'label', srcOfficial: '', srcRetail: ''
@@ -72,9 +72,20 @@ const NEWFOOD = {
         <label>수분 %<i>*</i>${inp('ga.moisture', '', true)}</label>
         <label>조회분 %${inp('ga.ash', '', true)}</label>
       </div>
+      <div class="nf-g2">
+        <label>칼로리 (100g당 kcal)${inp('kcal100', '340', true)}
+          <small>라벨에 있으면 꼭 넣어주세요. 없으면 영양성분으로 추정하는데, 지방이 높은 사료일수록 급여량이 어긋납니다.</small></label>
+        <label>생육 함량 %${inp('meat', '', true)}
+          <small>"생고기 70%" 처럼 적혀 있을 때만. 비교 화면의 생육 함량 줄에 씁니다.</small></label>
+      </div>
 
       <div class="nf-sec">원료 <span>표기 순서 그대로, 한 줄에 하나</span></div>
       <textarea data-nf="ingredients" class="nf-ta" placeholder="닭고기&#10;현미&#10;닭기름&#10;…">${esc(f.ingredients)}</textarea>
+
+      <div class="nf-sec">제품 사진 <span>봉지 사진이어야 해요</span></div>
+      <label class="nf-l">썸네일 주소${inp('thumb', 'https://…')}
+        <small>브랜드 로고나 다른 맛 사진이면 사용자가 헷갈립니다. 주소를 넣으면 아래에 그대로 보여드려요.</small></label>
+      <div id="nfThumb"></div>
 
       <div class="nf-sec">가격 <span>가장 작은 용량 기준</span></div>
       <div class="nf-g4">
@@ -84,6 +95,10 @@ const NEWFOOD = {
         <label>판매 용량 전부 <i>*</i>${inp('price.wgOptions', '2000, 6000')}</label>
       </div>
       <label class="nf-l">쿠팡 파트너스 구매 링크${inp('price.buyUrl', 'https://link.coupang.com/a/…')}</label>
+      <label class="nf-l">용량별 가격 <span style="color:var(--muted);font-weight:400">— 상세 화면의 최저가 비교에 씁니다</span>
+        <textarea data-nf="priceLines" class="nf-ta" style="min-height:70px"
+          placeholder="1000, 8500, https://link.coupang.com/a/…&#10;6000, 39900, https://link.coupang.com/a/…">${esc(f.priceLines)}</textarea>
+        <small>한 줄에 하나 — <b>용량(g), 가격(원), 구매링크</b> 순서. 링크는 없으면 비워도 돼요.</small></label>
 
       <div class="nf-sec">출처 <span>게이트가 실제로 열어 봅니다</span></div>
       <label class="nf-l">성분 근거가 무엇인가요
@@ -119,7 +134,7 @@ const NEWFOOD = {
     const f = this.f;
     if (!f) return false;
     return !!(f.brand || f.name || f.brandSlug || f.ingredients.trim() ||
-      f.price.p || f.price.wg || f.srcOfficial || f.srcRetail ||
+      f.price.p || f.price.wg || f.srcOfficial || f.srcRetail || f.thumb || f.priceLines.trim() ||
       Object.values(f.ga).some(v => v !== ''));
   },
 
@@ -159,9 +174,23 @@ const NEWFOOD = {
     const ingr = ENGINE.deriveIngredients(list);
     const dist = ENGINE.deriveDist(ingr);
     const funcIngr = ENGINE.deriveFuncIngr(list);
-    const nutrient = ENGINE.deriveNutrient(ga);
+    /* 라벨은 100g당 kcal 로 적는다. 엔진은 kg당으로 받는다. 여기서 한 번만 바꾼다. */
+    const kcal100 = num(f.kcal100);
+    const nutrient = ENGINE.deriveNutrient(
+      { ...ga, kcalPerKg: kcal100 != null ? Math.round(kcal100 * 10) : null },
+      { meatRatio: num(f.meat) });
     const p = num(f.price.p), wg = num(f.price.wg);
     const pKg = (p && wg) ? Math.round(p / wg * 1000) : null;
+
+    /* 용량별 가격 — "용량(g), 가격(원), 링크" 한 줄에 하나. */
+    const prices = String(f.priceLines).split('\n').map(s => s.trim()).filter(Boolean)
+      .map(line => {
+        const [wgS, pS, url] = line.split(',').map(x => (x ?? '').trim());
+        const w = num(wgS), pr = num(pS);
+        if (!w || !pr) return null;
+        return { wg: w, shop: f.price.shop, price: pr,
+          pKg: Math.round(pr / w * 1000), ...(url ? { url } : {}) };
+      }).filter(Boolean).sort((a, b) => a.wg - b.wg);
     const facts = {
       protein: ga.protein, dmCarb: nutrient.dmCarb,
       firstIngrCat: ingr[0]?.cat ?? null,
@@ -170,7 +199,7 @@ const NEWFOOD = {
     const ratings = ENGINE.rateAll(facts);
     const score = Object.values(ratings).every(v => v != null) ? ENGINE.computeScore(ratings) : null;
     const { fit } = ENGINE.deriveFit({ nutrient, ingr, dist, funcIngr });
-    return { ga, list, ingr, dist, funcIngr, nutrient, facts, ratings, score, pKg,
+    return { ga, list, ingr, dist, funcIngr, nutrient, facts, ratings, score, pKg, prices,
       func: Object.keys(funcIngr), concerns: [...new Set(fit.map(x => x.concernType))].sort() };
   },
 
@@ -186,7 +215,29 @@ const NEWFOOD = {
       kg당 ${d.pKg ? d.pKg.toLocaleString('ko-KR') + '원' : '—'}<br>
       별점 원료 ${d.ratings.quality ?? '—'} · 첨가물 ${d.ratings.additive ?? '—'} ·
       탄수 ${d.ratings.carb ?? '—'} · 가성비 ${d.ratings.value ?? '—'} · <b>총점 ${d.score ?? '—'}</b>
+      칼로리 ${d.nutrient.calKg ? d.nutrient.calKg.toLocaleString('ko-KR') + 'kcal/kg' : '<span style="color:var(--warn)">미입력 — 급여량을 추정으로 냅니다</span>'} ·
+      생육 함량 ${d.nutrient.meat != null ? d.nutrient.meat + '%' : '표기 없음'} ·
+      용량별 가격 ${d.prices.length}줄
       ${unknown.length ? `<br><span style="color:var(--warn)">사전에 없는 원료 ${unknown.length}종 — ${esc(unknown.map(i => i.name).join(', '))}</span>` : ''}`;
+
+    /* 썸네일은 주소만 봐선 맞는지 알 수 없다. 눌러보지 않아도 보이게 띄운다 —
+       브랜드 로고나 다른 맛 사진이 들어가는 사고가 실제로 있었다. */
+    const tb = document.getElementById('nfThumb');
+    if (tb) {
+      const u = this.f.thumb.trim();
+      tb.innerHTML = !u ? ''
+        : !/^https:\/\//.test(u)
+          ? `<div style="color:var(--warn);font-size:12px;margin-top:6px">https 주소여야 해요 — 이 주소는 사이트에서 안 뜹니다.</div>`
+          : `<div style="margin-top:8px;display:flex;align-items:center;gap:12px">
+               <div style="width:88px;height:88px;border-radius:12px;background:#fff;
+                    box-shadow:inset 0 0 0 1px var(--line);display:grid;place-items:center;overflow:hidden">
+                 <img src="${esc(u)}" alt="" style="max-width:76px;max-height:76px;object-fit:contain"
+                      onerror="this.parentElement.innerHTML='<span style=&quot;font-size:11px;color:var(--bad)&quot;>안 열려요</span>'">
+               </div>
+               <div style="font-size:12px;color:var(--sub);line-height:1.6">
+                 이 사진이 <b>이 제품 봉지</b>가 맞나요?<br>다른 맛·다른 용량이면 사용자가 헷갈립니다.</div>
+             </div>`;
+    }
   },
 
   /* 게이트가 잡기 전에, 여기서 먼저 막을 수 있는 것들 */
@@ -228,6 +279,12 @@ const NEWFOOD = {
         func: d.func, warnN: d.dist.caution + d.dist.danger, concerns: d.concerns,
         facts: d.facts, specOrigin: f.specOrigin,
         ga: d.ga, ingredients: d.list,
+        ...(f.thumb.trim() ? { thumb: f.thumb.trim() } : {}),
+        /* 칼로리와 생육 함량은 상세 화면이 쓰는 값이다. 칼로리가 없으면 급여량을
+           영양성분으로 추정하는데, 지방이 높은 사료일수록 그 오차가 커진다. */
+        ...(d.nutrient.calKg != null ? { kcalPerKg: d.nutrient.calKg } : {}),
+        ...(d.nutrient.meat != null ? { meatRatio: d.nutrient.meat } : {}),
+        ...(d.prices.length ? { prices: d.prices } : {}),
         price: {
           p: Number(f.price.p), wg: Number(f.price.wg), shop: f.price.shop, pKg: d.pKg,
           wgOptions: String(f.price.wgOptions).split(/[,\s]+/).map(Number).filter(n => n > 0).sort((a, b) => a - b),
