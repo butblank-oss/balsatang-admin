@@ -141,6 +141,19 @@ const PUB = {
       if (Object.keys(details).length)
         this.spliceDecl(lines, 'DETAIL', obj => ({ ...obj, ...details }));
       files.push({ path: this.DATA, text: lines.join('\n') });
+
+      /* 캐시 깨기 —
+         index.html 이 data.js?v=2 를 부르는데 이 번호가 고정이었다. GitHub Pages 는
+         모든 파일에 max-age=600 을 건다. 그래서 발행해도 브라우저는 같은 주소의 옛
+         data.js 를 계속 썼다. index.html 캐시 10분이 풀린 뒤에도 data.js 주소가
+         그대로라 또 10분을 캐시에서 읽는다 — 새로 올린 사료가 20분 넘게 안 보였다.
+         발행할 때마다 번호를 올려 주소를 바꾼다. 주소가 다르면 캐시가 안 걸린다. */
+      const html = await GH.getFileOrNull('index.html');
+      if (html) {
+        const stamp = now.replace(/\D/g, '').slice(0, 12);   // 202608031433
+        const next = html.text.replace(/\?v=[0-9]+/g, `?v=${stamp}`);
+        if (next !== html.text) files.push({ path: 'index.html', text: next });
+      }
     }
 
     /* 반려 기록 — 있으면 이어 쓴다 */

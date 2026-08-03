@@ -840,12 +840,35 @@ async function commit() {
   const btn = $('#commit');
   btn.disabled = true; btn.textContent = '커밋 중…';
   try {
-    const res = await GH.putFile(PATH, serialize(), S.sha, commitMessage(dl));
-    S.sha = res.content.sha;
+    /* putFile 은 파일 sha 를 같이 보내서, 그 사이 누가 data.js 를 고쳤으면 409 로
+       막아 줬다. commitFiles 는 브랜치 머리만 본다 — 남이 올린 data.js 를 통째로
+       덮어쓸 수 있다. 그 보호를 여기서 되살린다. */
+    const cur = await GH.getFile(PATH);
+    if (cur.sha !== S.sha) {
+      toast('그 사이 다른 곳에서 data.js 가 바뀌었어요 — 새로고침한 뒤 다시 고쳐주세요', true);
+      return;
+    }
+
+    const files = [{ path: PATH, text: serialize() }];
+
+    /* 캐시 깨기 — index.html 이 data.js?v=2 를 부르는데 이 번호가 고정이었다.
+       GitHub Pages 가 모든 파일에 max-age=600 을 걸어서, 고쳐 올려도 브라우저는
+       같은 주소의 옛 data.js 를 계속 읽었다. 두 캐시가 겹치면 20분 넘게 안 바뀐다.
+       커밋할 때마다 번호를 올려 주소를 바꾼다. */
+    const html = await GH.getFileOrNull('index.html');
+    if (html) {
+      const stamp = new Date().toISOString().replace(/\D/g, '').slice(0, 12);
+      const next = html.text.replace(/\?v=[0-9]+/g, `?v=${stamp}`);
+      if (next !== html.text) files.push({ path: 'index.html', text: next });
+    }
+
+    const commit = await GH.commitFiles(files, commitMessage(dl));
+    /* 한 커밋에 두 파일을 넣으면 data.js 의 새 sha 를 응답에서 못 받는다. 다시 읽는다. */
+    S.sha = (await GH.getFile(PATH)).sha;
     S.orig = new Map(S.foods.map(f => { delete f.__reScore; return [f.id, JSON.stringify(f)]; }));
     S.origDetail = new Map(Object.entries(S.detail).map(([k, v]) => [k, JSON.stringify(v)]));
     $('#meta').textContent = `${S.foods.length}종 · ${S.sha.slice(0, 7)}`;
-    toast(`커밋했어요 — ${res.commit.sha.slice(0, 7)}. 몇 분 뒤 사이트에 반영돼요`);
+    toast(`커밋했어요 — ${commit.sha.slice(0, 7)}. 몇 분 뒤 사이트에 반영돼요`);
     render();
   } catch (e) {
     toast(e.message, true);
