@@ -264,6 +264,22 @@ select.inp{cursor:pointer;appearance:none;
 #toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 .dirty-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--warn);
   margin-left:5px;vertical-align:middle}
+.nf-sec{font-size:12px;font-weight:700;color:var(--sub);letter-spacing:.03em;margin:18px 0 9px;
+  padding-bottom:6px;border-bottom:1px solid var(--line)}
+.nf-sec span{font-weight:500;color:var(--muted);letter-spacing:0}
+.modal label,.nf-l{display:block;font-size:11.5px;font-weight:600;color:var(--sub);margin-bottom:10px}
+.modal label i{color:var(--bad);font-style:normal;margin-left:2px}
+.modal label input,.modal label select,.nf-ta{width:100%;margin-top:5px;padding:9px 11px;border-radius:8px;
+  background:var(--panel2);border:1px solid var(--line);color:var(--ink);font:inherit;font-size:13px}
+.modal label input:focus,.modal label select:focus,.nf-ta:focus{outline:none;border-color:var(--pri)}
+.nf-ta{min-height:120px;line-height:1.7;resize:vertical}
+.nf-g2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.nf-g4{display:grid;grid-template-columns:repeat(4,1fr);gap:0 10px}
+.nf-g5{display:grid;grid-template-columns:repeat(5,1fr);gap:0 8px}
+.nf-out{margin-top:14px;padding:12px 14px;border-radius:8px;background:var(--panel2);
+  border:1px solid var(--line);font-size:12px;line-height:1.8;color:var(--ink2)}
+.nf-out b{color:var(--ink)}
+@media (max-width:640px){.nf-g2,.nf-g4,.nf-g5{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
@@ -295,14 +311,17 @@ select.inp{cursor:pointer;appearance:none;
 <div id="toast"></div>
 
 <script>
-/* 사료·콘텐츠 데이터는 앱(balsatang.com)에 있다. 여기 사본을 두지 않는다. */
+/* 사료·콘텐츠 데이터와 채점 엔진은 앱(balsatang.com)에 있다. 여기 사본을 두지 않는다.
+   등록 폼이 엔진으로 별점을 계산하므로 엔진도 같이 읽는다. */
 window.APP_BASE = (function () {
   try { var o = localStorage.getItem('balsatang.appBase'); if (o) return o; } catch (e) { }
   return /(^|\.)balsatang\.com$/.test(location.hostname) ? 'https://balsatang.com/' : '../app/';
 })();
-document.write(['data.js', 'articles.js']
+document.write(['engine/dict.js', 'engine/phrases.js', 'engine/engine.js', 'data.js', 'articles.js']
   .map(function (f) { return '<scr' + 'ipt src="' + window.APP_BASE + f + '"><\/scr' + 'ipt>'; }).join(''));
 </script>
+<script src="github.js"></script>
+<script src="newfood.js"></script>
 <script src="store.js"></script>
 <script src="app.js"></script>
 </body>
