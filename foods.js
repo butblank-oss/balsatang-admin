@@ -883,8 +883,13 @@ async function boot() {
   }
   if (!GH.token) {
     $('#meta').textContent = '토큰이 필요해요';
+    /* 어드민 안에서는 이 화면의 머리가 감춰져 있다. '오른쪽 위' 라고만 하면
+       어느 오른쪽 위인지 알 수 없다 — 껍데기 것을 가리켜 준다. */
+    const inShell = document.documentElement.classList.contains('embedded');
     $('#wrap').innerHTML = `<div class="empty"><b>먼저 토큰을 넣어주세요</b>
-      오른쪽 위 <b>토큰</b> 버튼을 누르면 넣을 수 있어요.</div>`;
+      ${inShell
+        ? '이 화면 맨 위 <b>토큰</b> 버튼을 누르면 넣을 수 있어요. 한 번 넣으면 사료 관리·가격·심사가 함께 씁니다.'
+        : '오른쪽 위 <b>토큰</b> 버튼을 누르면 넣을 수 있어요.'}</div>`;
     return;
   }
   try {
