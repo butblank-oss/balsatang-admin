@@ -130,6 +130,7 @@ const FILTERS = [
   { k: 'nobuy', label: '구매링크 없음', test: f => !buyOf(f) },
   { k: 'noprice', label: '가격 없음', test: f => !f.price?.p },
   { k: 'pending', label: '분석 준비 중', test: f => !analyzed(f) },
+  { k: 'retired', label: '내린 것', test: f => f.status !== 'published' },
   { k: 'rx', label: '처방식', test: f => !!f.rx },
   { k: 'edited', label: '수정함', test: isDirty }
 ];
@@ -200,12 +201,16 @@ function renderList() {
 
 function rowHtml(f) {
   const pills = [];
+  /* 내려간 사료는 프론트에 안 보인다. 목록에서 눈에 띄게 표시하지 않으면
+     '왜 사이트에 안 뜨지' 를 여기서 알아낼 방법이 없다. */
+  const off = f.status !== 'published';
+  if (off) pills.push('<span class="pill no">내림 · 프론트에 안 보임</span>');
   if (!hasThumb(f)) pills.push('<span class="pill no">썸네일 없음</span>');
   if (!buyOf(f)) pills.push('<span class="pill wa">구매링크 없음</span>');
   if (!analyzed(f)) pills.push('<span class="pill wa">분석 준비 중</span>');
   if (f.rx) pills.push('<span class="pill ok">처방식</span>');
   if (!pills.length) pills.push('<span class="pill ok">정상</span>');
-  return `<tr data-id="${f.id}" class="${isDirty(f) ? 'edited' : ''}">
+  return `<tr data-id="${f.id}" class="${isDirty(f) ? 'edited' : ''}" style="${off ? 'opacity:.55' : ''}">
     <td>${hasThumb(f)
       ? `<img class="thumb" src="${esc(f.thumb)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb none',textContent:'?'}))">`
       : `<div class="thumb none">?</div>`}</td>
@@ -225,6 +230,9 @@ const FIELDS = [
   { k: 'type', label: '제형', sel: TYPE_KO },
   { k: 'country', label: '원산지', sel: COUNTRY_KO },
   { k: 'rx', label: '처방식 여부', sel: { '': '일반', '1': '처방식' }, bool: true },
+  /* 프론트는 status === 'published' 인 것만 보여준다. 내려도 데이터는 남으니
+     언제든 되돌릴 수 있다 — 지우는 것과 다르다. */
+  { k: 'status', label: '노출 상태', sel: { published: '프론트에 보임', retired: '내림 (안 보임)' } },
   { k: 'thumb', label: '썸네일 URL', wide: true, hint: '쿠팡·다나와 상품 이미지 주소' }
 ];
 
