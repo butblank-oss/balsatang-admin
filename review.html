@@ -393,14 +393,19 @@ function editBlock(it){
 function card(it){
   const g=it.gates;
   const badges=[
-    it.pricePending
-      ? `<span class="b wa">가격 대기</span>`
-      : `<span class="b ${g.g1==='pass'?'ok':'no'}">게이트1 ${g.g1==='pass'?'통과':'탈락'}</span>`,
+    /* 자료 수집 중은 '탈락' 이 아니다. 아직 라벨을 못 본 것뿐이라 다르게 적는다. */
+    it.draft
+      ? `<span class="b wa">자료 수집 중</span>`
+      : it.pricePending
+        ? `<span class="b wa">가격 대기</span>`
+        : `<span class="b ${g.g1==='pass'?'ok':'no'}">게이트1 ${g.g1==='pass'?'통과':'탈락'}</span>`,
     /* 사람이 라벨을 보고 직접 넣은 건은 AI 블라인드 대조를 면제한다. 통과처럼
        보이게 하지 않고 '사람 입력' 이라고 그대로 적는다 — 심사자가 알아야 한다. */
-    g.g2==='사람'
-      ? `<span class="b wa">사람 입력 · 라벨 판독</span>`
-      : `<span class="b ${g.g2==='match'?'ok':'no'}">게이트2 ${g.g2==='match'?'일치':'불일치'}</span>`,
+    /* 자료 수집 중이면 대조할 값 자체가 없다. '불일치' 라고 적으면 틀렸다는 뜻이 된다. */
+    it.draft ? ''
+      : g.g2==='사람'
+        ? `<span class="b wa">사람 입력 · 라벨 판독</span>`
+        : `<span class="b ${g.g2==='match'?'ok':'no'}">게이트2 ${g.g2==='match'?'일치':'불일치'}</span>`,
     g.g3warn.length?`<span class="b wa">게이트3 경고 ${g.g3warn.length}</span>`:`<span class="b ok">게이트3 정상</span>`,
     isEdited(it)?`<span class="b ed">수정됨</span>`:''
   ].join('');
@@ -415,11 +420,13 @@ function card(it){
       </div>
     </div>
     <div class="body">
-      ${it.pricePending?`<div class="msg w">⏸ 가격을 아직 못 구했습니다. 쿠팡 상품 URL 과 최소 용량 가격이 들어와야 발행할 수 있습니다</div>`:''}
+      ${it.draft?`<div class="msg w"><b>자료 수집 중</b> — 카탈로그에서 기본 정보만 가져온 상태예요.
+         아래를 채우면 채점이 돌아갑니다.<br>${(g.todo||[]).map(t=>'· '+esc(t)).join('<br>')}</div>`
+        : it.pricePending?`<div class="msg w">⏸ 가격을 아직 못 구했습니다. 쿠팡 상품 URL 과 최소 용량 가격이 들어와야 발행할 수 있습니다</div>`:''}
       ${g.g1fail.map(f=>`<div class="msg f">✗ ${esc(f.msg)}</div>`).join('')}
       ${g.g1warn.map(w=>`<div class="msg w">⚠ ${esc(w.msg)}</div>`).join('')}
       ${g.g3warn.map(w=>`<div class="msg w">⚠ ${esc(w)}</div>`).join('')}
-      <div class="sec"><h3>대조</h3>${auditTable(it)}</div>
+      ${it.draft?'':`<div class="sec"><h3>대조</h3>${auditTable(it)}</div>`}
       <div class="sec"><h3>출처와 근거</h3>${sourceBlock(it)}</div>
       ${editBlock(it)}
     </div>
