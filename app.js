@@ -66,10 +66,10 @@ const EMBED = {
 function pgEmbed(k){
   const e = EMBED[k];
   el('wrap').innerHTML = `
-    <div class="card" style="margin-bottom:12px;background:var(--pri-soft);border-color:#23386b;
-         color:#9DBBF5;font-size:12.5px;line-height:1.65">${e.note}</div>
+    <div style="margin-bottom:10px;padding:9px 13px;border-radius:8px;background:var(--pri-soft);
+         border:1px solid #23386b;color:#9DBBF5;font-size:12px;line-height:1.55">${e.note}</div>
     <iframe src="${e.src}" title="${e.title}"
-      style="width:100%;height:calc(100vh - 190px);min-height:520px;border:1px solid var(--line);
+      style="width:100%;height:calc(100vh - 132px);min-height:600px;border:1px solid var(--line);
              border-radius:12px;background:var(--bg);display:block"></iframe>`;
 }
 const TITLES = {dash:'대시보드', foods:'사료 관리', ingr:'성분 관리', tags:'맞춤찾기 태그 관리',

@@ -865,6 +865,8 @@ $('#tokenBtn').onclick = askToken;
 $('#panelClose').onclick = closePanel;
 $('#panelDone').onclick = closePanel;
 $('#dim').onclick = closePanel;
+/* 창 바깥(어두운 여백)을 눌러도 닫는다. 안쪽 클릭은 여기까지 안 온다. */
+$('#panel').onclick = e => { if (e.target === $('#panel')) closePanel(); };
 $('#panelReset').onclick = () => {
   const f = S.cur;
   if (!f) return;

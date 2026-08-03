@@ -46,7 +46,7 @@ const NEWFOOD = {
     const multi = (path, dict) => `<div style="display:flex;gap:6px;flex-wrap:wrap">${Object.entries(dict)
       .map(([v, l]) => `<button class="chip ${(this.get(path) || []).includes(v) ? 'on' : ''}" data-nfm="${path}" data-v="${v}">${l}</button>`).join('')}</div>`;
 
-    showModal(`<div class="modal" style="max-width:720px">
+    showModal(`<div class="modal" style="max-width:900px">
       <div class="modal-h"><b>사료 등록</b>
         <p>여기서 올린 건 <b>바로 발행되지 않아요.</b> 게이트 검사를 거쳐 발행 심사에 올라가고,
            거기서 한 번 더 확인한 뒤에 사이트에 나갑니다.<br>

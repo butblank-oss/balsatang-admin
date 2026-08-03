@@ -63,14 +63,29 @@ td.num{font-variant-numeric:tabular-nums;text-align:right}
 .pill.no{background:var(--bad-soft);border-color:var(--bad);color:#FCA5A5}
 .pill.wa{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
 
-.panel{position:fixed;top:0;right:0;bottom:0;width:min(560px,100%);z-index:40;background:var(--panel);
-  border-left:1px solid var(--line);transform:translateX(100%);transition:transform .25s var(--t);
-  display:flex;flex-direction:column}
-.panel.on{transform:none}
-.panel .ph{padding:15px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
-.panel .pb{flex:1;overflow-y:auto;padding:18px}
-.panel .pf{padding:13px 18px;border-top:1px solid var(--line);display:flex;gap:8px}
-.dim{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.5);opacity:0;pointer-events:none;
+/* 편집 창. 오른쪽 서랍(560px)으로는 아홉 구역을 넣기에 좁아서
+   가운데 큰 창으로 바꿨다. 넓은 화면에서는 본문을 두 단으로 펼친다. */
+.panel{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:2vh 2vw;
+  opacity:0;pointer-events:none;transition:opacity .18s var(--t)}
+.panel.on{opacity:1;pointer-events:auto}
+.panel .box{width:min(1180px,96vw);height:min(94vh,1000px);background:var(--panel);
+  border:1px solid var(--line2);border-radius:var(--r-lg);display:flex;flex-direction:column;
+  overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.5);transform:translateY(10px) scale(.995);
+  transition:transform .2s var(--t)}
+.panel.on .box{transform:none}
+.panel .ph{padding:15px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;
+  background:var(--panel2)}
+.panel .pb{flex:1;overflow-y:auto;padding:20px 22px;
+  column-count:2;column-gap:28px;column-rule:1px solid var(--line)}
+/* 구역이 단 경계에서 잘리지 않게 */
+.panel .pb > *{break-inside:avoid}
+.panel .pf{padding:13px 20px;border-top:1px solid var(--line);display:flex;gap:8px;background:var(--panel2)}
+@media (max-width:900px){
+  .panel{padding:0}
+  .panel .box{width:100%;height:100%;border-radius:0;border:0}
+  .panel .pb{column-count:1}
+}
+.dim{position:fixed;inset:0;z-index:35;background:rgba(0,0,0,.62);opacity:0;pointer-events:none;
   transition:opacity .25s}
 .dim.on{opacity:1;pointer-events:auto}
 
@@ -145,13 +160,15 @@ td.num{font-variant-numeric:tabular-nums;text-align:right}
 
 <div class="dim" id="dim"></div>
 <div class="panel" id="panel">
-  <div class="ph"><b id="panelTitle" style="font-size:15px"></b><div style="flex:1"></div>
-    <button class="btn" id="panelClose">닫기</button></div>
-  <div class="pb" id="panelBody"></div>
-  <div class="pf">
-    <button class="btn" id="panelReset">이 사료 되돌리기</button>
-    <div style="flex:1"></div>
-    <button class="btn pri" id="panelDone">적용</button>
+  <div class="box">
+    <div class="ph"><b id="panelTitle" style="font-size:15px"></b><div style="flex:1"></div>
+      <button class="btn" id="panelClose">닫기</button></div>
+    <div class="pb" id="panelBody"></div>
+    <div class="pf">
+      <button class="btn" id="panelReset">이 사료 되돌리기</button>
+      <div style="flex:1"></div>
+      <button class="btn pri" id="panelDone">적용</button>
+    </div>
   </div>
 </div>
 
