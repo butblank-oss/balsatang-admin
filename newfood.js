@@ -97,7 +97,7 @@ const NEWFOOD = {
       <div class="nf-out" id="nfOut"></div>
 
       <div class="modal-f">
-        <button class="btn" onclick="closeModal()">닫기</button>
+        <button class="btn" onclick="tryCloseModal()">닫기</button>
         <div style="flex:1"></div>
         <button class="btn pri" id="nfSubmit">심사에 올리기</button>
       </div>
@@ -105,6 +105,15 @@ const NEWFOOD = {
 
     this.bind();
     this.preview();
+  },
+
+  /* 사람이 뭔가 적었는지. 처음 열었을 때 그대로면 닫아도 잃을 게 없다. */
+  dirty() {
+    const f = this.f;
+    if (!f) return false;
+    return !!(f.brand || f.name || f.brandSlug || f.ingredients.trim() ||
+      f.price.p || f.price.wg || f.srcOfficial || f.srcRetail ||
+      Object.values(f.ga).some(v => v !== ''));
   },
 
   get(path) { return path.split('.').reduce((o, k) => o?.[k], this.f); },
@@ -246,6 +255,7 @@ const NEWFOOD = {
         `어드민에서 사람이 직접 넣었습니다. 게이트를 거쳐 발행 심사에 올라갑니다.\n` +
         `총점 ${d.score ?? '—'} · 원료 ${d.list.length}종 · kg당 ${d.pKg?.toLocaleString('ko-KR')}원`);
 
+      this.f = null;   /* 올렸으니 이제 잃을 게 없다 */
       closeModal();
       toast('올렸어요 — 게이트 검사 뒤 발행 심사에 나타나요');
     } catch (e) {

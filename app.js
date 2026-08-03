@@ -19,6 +19,14 @@ function save(){
   if(ok === false) toast('브라우저 저장 용량이 가득 찼어요 — 내보내기로 파일을 받아주세요');
   return ok;
 }
+/* 바깥을 눌렀다고 바로 닫지 않는다. 등록 폼은 닫으면 적은 게 다 날아간다. */
+function tryCloseModal(){
+  if(typeof NEWFOOD !== 'undefined' && NEWFOOD.dirty && NEWFOOD.dirty()){
+    if(!confirm('적은 내용이 사라져요. 닫을까요?')) return;
+  }
+  closeModal();
+}
+
 function markDirty(){ el('dirtyDot').innerHTML = store.dirty ? '<span class="dirty-dot"></span>' : ''; }
 
 /* ═══ 한글 입력 ═══

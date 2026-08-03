@@ -864,9 +864,15 @@ async function boot() {
 $('#tokenBtn').onclick = askToken;
 $('#panelClose').onclick = closePanel;
 $('#panelDone').onclick = closePanel;
-$('#dim').onclick = closePanel;
-/* 창 바깥(어두운 여백)을 눌러도 닫는다. 안쪽 클릭은 여기까지 안 온다. */
-$('#panel').onclick = e => { if (e.target === $('#panel')) closePanel(); };
+/* 바깥을 눌렀다고 바로 닫지 않는다. 큰 창이라 여백이 넓어서 실수로 누르기 쉽다.
+   고친 게 없으면 그냥 닫고, 있으면 물어본다. */
+function tryClosePanel() {
+  const f = S.cur;
+  if (f && isDirty(f) && !confirm('이 사료에서 고친 내용이 있어요. 편집 창을 닫을까요?\n\n(닫아도 고친 내용은 남아 있어요. 아래 GitHub 에 커밋을 눌러야 반영돼요.)')) return;
+  closePanel();
+}
+$('#dim').onclick = tryClosePanel;
+$('#panel').onclick = e => { if (e.target === $('#panel')) tryClosePanel(); };
 $('#panelReset').onclick = () => {
   const f = S.cur;
   if (!f) return;
@@ -884,7 +890,7 @@ $('#revert').onclick = () => {
   render();
 };
 $('#commit').onclick = commit;
-addEventListener('keydown', e => { if (e.key === 'Escape' && S.cur) closePanel(); });
+addEventListener('keydown', e => { if (e.key === 'Escape' && S.cur) tryClosePanel(); });
 addEventListener('beforeunload', e => { if (dirtyList().length) { e.preventDefault(); e.returnValue = ''; } });
 
 boot();
