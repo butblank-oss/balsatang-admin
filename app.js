@@ -165,17 +165,31 @@ function openToken(){
   };
 }
 
+/* 주소에 지금 화면을 적는다. 새로고침하면 대시보드로 튕기던 걸 막는다 —
+   사료 관리에서 뭘 보다가 F5 를 누르면 처음부터 다시 찾아가야 했다. */
+function hashFor(k){ return '#' + k; }
+function pageFromHash(){
+  const k = String(location.hash || '').replace(/^#/, '');
+  return (TITLES[k] || EMBED[k]) ? k : 'dash';
+}
+
 function go(k, arg){
   page = k;
   el('pgTitle').textContent = TITLES[k] || '';
   el('tokenBtn').textContent = tokenNow() ? '토큰 ✓' : '토큰';
   closeSide();
   renderNav();
+  /* replaceState 로 주소만 갈아끼우면 새로고침은 살아나도 뒤로가기가 죽는다.
+     hash 를 바꾸면 브라우저가 알아서 기록을 쌓고 hashchange 를 준다 —
+     아래 핸들러가 다를 때만 go 를 부르므로 되돌이는 생기지 않는다. */
+  if (location.hash !== hashFor(k)) location.hash = hashFor(k);
   if(EMBED[k]){ pgEmbed(k); el('wrap').scrollTop = 0; return; }
   ({dash:pgDash, ingr:pgIngr, tags:pgTags, recall:pgRecall,
     article:pgArticle, reviews:pgReview}[k] || pgDash)(arg);
   el('wrap').scrollTop = 0;
 }
+/* 뒤로가기·앞으로가기도 같이 따라간다 */
+addEventListener('hashchange', () => { const k = pageFromHash(); if (k !== page) go(k); });
 
 /* ═══ 대시보드 ═══ */
 function pgDash(){
@@ -647,5 +661,5 @@ function resetDraft(){
 
 /* ═══ INIT ═══ */
 const mode = store.init();
-renderNav(); markDirty(); go('dash');
+renderNav(); markDirty(); go(pageFromHash());
 if(mode==='draft') toast('이전에 작업하던 내용을 불러왔어요');

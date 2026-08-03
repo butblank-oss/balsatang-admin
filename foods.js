@@ -142,7 +142,17 @@ function visible() {
     if (f0?.test && !f0.test(f)) return false;
     if (!q) return true;
     return (`${f.brand} ${f.name}`).toLowerCase().includes(q);
-  });
+  }).sort(byNewest);
+}
+
+/* 방금 올린 사료를 맨 위에. 발행 시각(src.publishedAt)이 있으면 그걸 쓰고,
+   없는 옛 항목은 뒤로 보낸다 — data.js 안의 순서는 등록 순서가 아니라
+   병합된 순서라 믿을 게 못 된다. */
+function byNewest(a, b) {
+  const t = f => Date.parse(f.src?.publishedAt ?? '') || 0;
+  const d = t(b) - t(a);
+  if (d) return d;
+  return `${a.brand} ${a.name}`.localeCompare(`${b.brand} ${b.name}`, 'ko');
 }
 
 /* 검색칸이 든 바와, 조건에 따라 바뀌는 목록을 나눈다.
