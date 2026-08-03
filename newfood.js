@@ -32,7 +32,7 @@ const NEWFOOD = {
       ingredients: '',
       price: { p: '', wg: '', shop: 'coupang', wgOptions: '', buyUrl: '' },
       specOrigin: 'domestic',
-      srcOfficial: '', srcRetail: ''
+      srcKind: 'label', srcOfficial: '', srcRetail: ''
     };
     this.render();
   },
@@ -86,7 +86,14 @@ const NEWFOOD = {
       <label class="nf-l">쿠팡 파트너스 구매 링크${inp('price.buyUrl', 'https://link.coupang.com/a/…')}</label>
 
       <div class="nf-sec">출처 <span>게이트가 실제로 열어 봅니다</span></div>
-      <label class="nf-l">공식/수입사 성분표 주소 <i>*</i>${inp('srcOfficial', 'https://…')}</label>
+      <label class="nf-l">성분 근거가 무엇인가요
+        <select data-nf="srcKind">
+          <option value="label"${f.srcKind === 'label' ? ' selected' : ''}>제품 라벨 (봉지·상세이미지 성분분석표)</option>
+          <option value="official"${f.srcKind === 'official' ? ' selected' : ''}>제조사 공식 페이지</option>
+          <option value="importer"${f.srcKind === 'importer' ? ' selected' : ''}>수입사 페이지</option>
+        </select></label>
+      <label class="nf-l">그 성분 근거가 있는 주소 <i>*</i>${inp('srcOfficial', 'https://…')}
+        <small>라벨 사진이면 그 사진이 실린 페이지 주소를 적으세요.</small></label>
       <label class="nf-l">판매처 상품 주소 <i>*</i>${inp('srcRetail', 'https://www.coupang.com/vp/products/…')}</label>
       <label class="nf-l">성분표 기준
         <select data-nf="specOrigin">
@@ -197,7 +204,7 @@ const NEWFOOD = {
     if (!opts.length) e.push('판매 용량을 하나 이상 적어주세요');
     else if (Number(f.price.wg) !== Math.min(...opts))
       e.push(`가격은 가장 작은 용량(${Math.min(...opts)}g) 기준이어야 합니다`);
-    if (!/^https:\/\//.test(f.srcOfficial)) e.push('공식 성분표 주소를 https 로 적어주세요');
+    if (!/^https:\/\//.test(f.srcOfficial)) e.push('성분 근거 주소를 https 로 적어주세요');
     if (!/^https:\/\//.test(f.srcRetail)) e.push('판매처 상품 주소를 https 로 적어주세요');
     if (f.price.buyUrl && !/^https:\/\/(link\.|www\.|m\.)?coupang\.com\//.test(f.price.buyUrl))
       e.push('구매 링크는 쿠팡 주소여야 합니다');
@@ -228,13 +235,24 @@ const NEWFOOD = {
         }
       },
       sources: [
-        { role: 'official', url: f.srcOfficial.trim(), fetchedAt: now, title: '공식 성분표 (사람이 확인)' },
+        { role: f.srcKind, url: f.srcOfficial.trim(), fetchedAt: now,
+          title: f.srcKind === 'label' ? '제품 라벨 성분분석표 (사람이 사진으로 판독)' : '공식 성분표 (사람이 확인)' },
         { role: 'retail', url: f.srcRetail.trim(), fetchedAt: now, title: '판매처 상품 페이지 (사람이 확인)' }
       ],
+      /* 게이트 1 은 REQUIRED_FACT_KEYS 다섯 개와 price.p 에 대해 { src, quote } 를 요구한다.
+         예전에는 ga.* 키에 문자열만 넣어서, 이 폼으로 올린 사료는 하나도 게이트를
+         통과하지 못했다 — 심사 화면까지 가지도 못했다. */
       evidence: {
-        'ga.protein': `조단백 ${d.ga.protein}% 이상 (라벨 표기)`,
-        'ga.fat': `조지방 ${d.ga.fat}% 이상 (라벨 표기)`,
-        'price.p': `${Number(f.price.p).toLocaleString('ko-KR')}원 / ${f.price.wg}g`
+        'facts.protein': { src: 0, quote: `조단백 ${d.ga.protein}% 이상 (라벨 표기)` },
+        'facts.dmCarb': { src: 0, quote:
+          `조단백 ${d.ga.protein} + 조지방 ${d.ga.fat} + 조섬유 ${d.ga.fiber} + 수분 ${d.ga.moisture}` +
+          ` → 건물기준 탄수 ${d.nutrient.dmCarb}%` },
+        'facts.firstIngrCat': { src: 0, quote: `1번 원료 = ${d.ingr[0]?.name ?? '—'} (${d.ingr[0]?.cat ?? '—'})` },
+        'facts.cautionN': { src: 0, quote:
+          `주의로 판정된 원료 ${d.dist.caution}종: ${d.ingr.filter(i => i.safe === 'caution').map(i => i.name).join(', ') || '없음'}` },
+        'facts.dangerN': { src: 0, quote:
+          `위험으로 판정된 원료 ${d.dist.danger}종: ${d.ingr.filter(i => i.safe === 'danger').map(i => i.name).join(', ') || '없음'}` },
+        'price.p': { src: 1, quote: `${Number(f.price.p).toLocaleString('ko-KR')}원 / ${f.price.wg}g` }
       },
       /* 사람이 직접 넣었다는 걸 남긴다. 심사 화면에서 이 표시를 보고 판단한다. */
       collector: { agent: '사람', via: 'admin.balsatang.com', at: now }

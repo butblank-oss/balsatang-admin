@@ -270,6 +270,9 @@ function toast(m){const t=document.getElementById('toast');t.textContent=m;t.cla
 /* 수집 AI 값과 심사 AI 값을 나란히 놓는다. 다른 줄은 빨갛게 표시한다. */
 function auditTable(it){
   const ind=it.audit?.independent||{};
+  /* 사람이 라벨 원본을 보고 넣은 건은 대조할 상대가 없다. 오른쪽 열이 전부 '—' 인 걸
+     '아직 안 돌았다' 로 읽으면 안 되니, 왜 비었는지 표에 대고 말한다. */
+  const byHuman=it.gates?.g2==='사람';
   const rows=[];
   /* 사실을 먼저 대조한다. 점수는 사실에서 계산되므로 사실이 맞으면 점수도 맞다. */
   for(const k of Object.keys(FACT_LABEL)){
@@ -286,9 +289,11 @@ function auditTable(it){
              ind.price?.p!=null&&ind.price.p!==it.proposed?.price?.p]);
   rows.push(['중량',(it.proposed?.price?.wg??'—')+'g',ind.price?.wg!=null?ind.price.wg+'g':'—',
              ind.price?.wg!=null&&ind.price.wg!==it.proposed?.price?.wg]);
-  return `<table><thead><tr><th>항목</th><th>수집 AI</th><th>심사 AI (독립 재조사)</th></tr></thead><tbody>${
+  return `<table><thead><tr><th>항목</th><th>${byHuman?'사람이 라벨에서 읽은 값':'수집 AI'}</th>
+      <th>${byHuman?'AI 재조사 — 면제':'심사 AI (독립 재조사)'}</th></tr></thead><tbody>${
     rows.map(([l,a,b,d])=>`<tr class="${d?'diff':''}"><td>${esc(l)}</td><td class="num">${esc(a)}</td><td class="num">${esc(b)}</td></tr>`).join('')
-  }</tbody></table>`;
+  }</tbody></table>${byHuman?`<p class="d" style="margin-top:8px">사람이 제품 라벨 원본을 보고 직접 넣은 값이라 AI 블라인드 재조사를 걸지 않습니다.
+     대신 <b>출처 링크를 열어 라벨 사진과 아래 값이 같은지</b> 직접 확인하세요.</p>`:''}`;
 }
 
 function sourceBlock(it){
@@ -381,7 +386,11 @@ function card(it){
     it.pricePending
       ? `<span class="b wa">가격 대기</span>`
       : `<span class="b ${g.g1==='pass'?'ok':'no'}">게이트1 ${g.g1==='pass'?'통과':'탈락'}</span>`,
-    `<span class="b ${g.g2==='match'?'ok':'no'}">게이트2 ${g.g2==='match'?'일치':'불일치'}</span>`,
+    /* 사람이 라벨을 보고 직접 넣은 건은 AI 블라인드 대조를 면제한다. 통과처럼
+       보이게 하지 않고 '사람 입력' 이라고 그대로 적는다 — 심사자가 알아야 한다. */
+    g.g2==='사람'
+      ? `<span class="b wa">사람 입력 · 라벨 판독</span>`
+      : `<span class="b ${g.g2==='match'?'ok':'no'}">게이트2 ${g.g2==='match'?'일치':'불일치'}</span>`,
     g.g3warn.length?`<span class="b wa">게이트3 경고 ${g.g3warn.length}</span>`:`<span class="b ok">게이트3 정상</span>`,
     isEdited(it)?`<span class="b ed">수정됨</span>`:''
   ].join('');
