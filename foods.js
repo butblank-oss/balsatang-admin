@@ -116,6 +116,20 @@ const dirtyDetail = id =>
 const isDirty = f => dirtyFood(f) || dirtyDetail(f.id);
 const dirtyList = () => S.foods.filter(isDirty);
 
+/* ── 커밋 바 ──
+   예전엔 목록을 그릴 때와 편집 화면에 들어올 때만 이걸 계산했다. 그래서 편집
+   화면에서 값을 고치는 동안에는 아무 일도 일어나지 않았고, 커밋 바가 끝내
+   나타나지 않았다 — 고쳐 놓고 올릴 방법이 없었다는 뜻이다.
+   이제 값이 바뀔 때마다 다시 센다. */
+function updateDock() {
+  const dock = $('#dock');
+  if (!dock) return;
+  const dl = dirtyList();
+  dock.hidden = dl.length === 0;
+  $('#count').innerHTML = `<b>${dl.length}건</b> 수정함 — ${
+    dl.map(f => esc(f.name)).slice(0, 3).join(', ')}${dl.length > 3 ? ' 외' : ''}`;
+}
+
 /* ── 목록 ── */
 const analyzed = f => !!(S.detail[f.id]?.ingr || []).length;
 const buyOf = f => f.price?.buyUrl || (S.detail[f.id]?.prices || []).find(p => p.url)?.url || null;
@@ -257,9 +271,7 @@ function renderList() {
   for (const tr of document.querySelectorAll('[data-id]'))
     tr.onclick = () => openPanel(tr.dataset.id);
 
-  const dl = dirtyList();
-  $('#dock').hidden = dl.length === 0;
-  $('#count').innerHTML = `<b>${dl.length}건</b> 수정함 — ${dl.map(f => esc(f.name)).slice(0, 3).join(', ')}${dl.length > 3 ? ' 외' : ''}`;
+  updateDock();
 }
 
 /* 이 사료에 뭐가 빠졌나. 목록의 상태 칸과 상태 정렬이 같은 걸 본다. */
@@ -350,9 +362,7 @@ function renderEditor() {
     if (od) S.detail[f.id] = JSON.parse(od); else delete S.detail[f.id];
     closePanel();
   };
-  const dl = dirtyList();
-  $('#dock').hidden = dl.length === 0;
-  $('#count').innerHTML = `<b>${dl.length}건</b> 수정함 — ${dl.map(x => esc(x.name)).slice(0, 3).join(', ')}${dl.length > 3 ? ' 외' : ''}`;
+  updateDock();
 }
 
 function panelHtml(f) {
@@ -420,6 +430,9 @@ function panelHtml(f) {
       ${nut('protein', '조단백 (%)')}${nut('fat', '조지방 (%)')}
       ${nut('fiber', '조섬유 (%)')}${nut('moisture', '수분 (%)')}
       ${nut('ash', '조회분 (%)')}${nut('meat', '생육 함량 (%)')}
+      ${/* 칼로리는 급여량 계산의 근거다. 이 값이 없으면 상세 화면의
+           '하루 몇 g' 이 안 나온다. 고칠 수 있어야 한다. */''}
+      ${nut('calKg', '칼로리 (kcal/kg)')}
     </div>
     <div class="derived" id="nutOut"></div>`)}
 
@@ -1024,6 +1037,13 @@ $('#revert').onclick = () => {
   for (const [k, v] of S.origDetail) S.detail[k] = JSON.parse(v);
   render();
 };
+/* 편집 화면의 어떤 칸을 건드리든 커밋 바를 다시 센다.
+   핸들러마다 부르면 언젠가 하나를 빠뜨린다 — 실제로 전부 빠져 있었다.
+   click 은 칩·행 추가·삭제처럼 입력 이벤트가 없는 조작을 잡는다.
+   해당 핸들러가 먼저 돌고 나서(버블 단계) 우리가 센다. */
+for (const ev of ['input', 'change', 'click'])
+  document.addEventListener(ev, () => { if (S.cur) updateDock(); }, false);
+
 $('#commit').onclick = commit;
 /* 페이지 전환이라 실수로 닫힐 일이 없다. Escape 는 목록으로 돌아가는 지름길. */
 addEventListener('keydown', e => { if (e.key === 'Escape' && S.cur) closePanel(); });
