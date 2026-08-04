@@ -47,7 +47,8 @@ const S = {
   origDetail: new Map(),
   cur: null,          // 편집 중인 food (있으면 화면이 편집 페이지)
   listScroll: 0,      // 목록으로 돌아왔을 때 보던 자리
-  q: '', filter: 'all'
+  q: '', filter: 'all',
+  sortK: 'reg', sortDir: -1   // 기본은 등록일 최신순
 };
 
 /* ── 잡동사니 ── */
@@ -142,17 +143,49 @@ function visible() {
     if (f0?.test && !f0.test(f)) return false;
     if (!q) return true;
     return (`${f.brand} ${f.name}`).toLowerCase().includes(q);
-  }).sort(byNewest);
+  }).sort(comparator());
 }
 
-/* 방금 올린 사료를 맨 위에. 발행 시각(src.publishedAt)이 있으면 그걸 쓰고,
-   없는 옛 항목은 뒤로 보낸다 — data.js 안의 순서는 등록 순서가 아니라
-   병합된 순서라 믿을 게 못 된다. */
-function byNewest(a, b) {
-  const t = f => Date.parse(f.src?.publishedAt ?? '') || 0;
-  const d = t(b) - t(a);
-  if (d) return d;
-  return `${a.brand} ${a.name}`.localeCompare(`${b.brand} ${b.name}`, 'ko');
+/* 등록일은 발행 시각(src.publishedAt) 이다. data.js 안의 줄 순서는 등록 순서가
+   아니라 병합된 순서라 믿을 게 못 된다.
+   최종수정일은 어드민에서 커밋할 때 찍는다(src.updatedAt) — 그 전에 올라온
+   사료엔 없다. 없는 걸 등록일로 메우면 '고친 적 없는데 고친 날짜' 가 생기니
+   그냥 '—' 로 둔다. */
+const regAt = f => Date.parse(f.src?.publishedAt ?? '') || 0;
+const modAt = f => Date.parse(f.src?.updatedAt ?? '') || 0;
+const nameOf = f => `${f.brand} ${f.name}`;
+
+/* 정렬 기준. cmp 가 같으면 이름순으로 갈라 순서가 흔들리지 않게 한다. */
+const SORTS = {
+  name: (a, b) => nameOf(a).localeCompare(nameOf(b), 'ko'),
+  type: (a, b) => String(a.type ?? '').localeCompare(String(b.type ?? '')),
+  price: (a, b) => (a.price?.p ?? -1) - (b.price?.p ?? -1),
+  pKg: (a, b) => (a.price?.pKg ?? -1) - (b.price?.pKg ?? -1),
+  reg: (a, b) => regAt(a) - regAt(b),
+  mod: (a, b) => modAt(a) - modAt(b),
+  /* 상태는 '문제 몇 개' 로 센다. 오름차순이면 멀쩡한 것부터 나온다. */
+  state: (a, b) => problems(a).length - problems(b).length
+};
+function comparator() {
+  const f = SORTS[S.sortK] ?? SORTS.reg;
+  return (a, b) => {
+    const d = f(a, b) * S.sortDir;
+    return d || nameOf(a).localeCompare(nameOf(b), 'ko');
+  };
+}
+
+/* 'yyyy.mm.dd' — 목록에선 시각까지 볼 일이 없다. 마우스를 올리면 전체가 뜬다. */
+function ymd(ms) {
+  if (!ms) return null;
+  const d = new Date(ms);
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())}`;
+}
+function whenCell(ms, cls) {
+  const s = ymd(ms);
+  return s
+    ? `<td class="when ${cls}" title="${esc(new Date(ms).toLocaleString('ko-KR'))}">${s}</td>`
+    : `<td class="when ${cls}">—</td>`;
 }
 
 /* 검색칸이 든 바와, 조건에 따라 바뀌는 목록을 나눈다.
@@ -182,6 +215,13 @@ function render() {
   renderList();
 }
 
+/* 정렬 가능한 머리칸 하나 */
+function th(k, label, style = '', cls = '') {
+  const on = S.sortK === k;
+  return `<th data-sort="${k}" class="sortable ${on ? 'on' : ''} ${cls}" style="${style}">` +
+    `${label}<span class="ar">${on ? (S.sortDir > 0 ? '▲' : '▼') : '↕'}</span></th>`;
+}
+
 function renderList() {
   const rows = visible();
   const counts = {};
@@ -192,15 +232,28 @@ function renderList() {
 
   $('#list').innerHTML = rows.length ? `<table>
       <thead><tr>
-        <th style="width:52px"></th><th>사료</th><th style="width:76px">제형</th>
-        <th style="width:130px" class="num">가격</th><th style="width:96px" class="num">kg당</th>
-        <th style="width:210px">상태</th>
+        <th style="width:52px"></th>
+        ${th('name', '사료')}
+        ${th('type', '제형', 'width:70px', 'c-type')}
+        ${th('price', '가격', 'width:120px', 'num')}
+        ${th('pKg', 'kg당', 'width:86px', 'num c-pkg')}
+        ${th('reg', '등록일', 'width:92px', 'c-reg')}
+        ${th('mod', '최종수정', 'width:92px', 'c-mod')}
+        ${th('state', '상태', 'width:200px')}
       </tr></thead>
       <tbody>${rows.map(rowHtml).join('')}</tbody>
     </table>` : `<div class="empty"><b>해당하는 사료가 없어요</b>다른 조건으로 찾아보세요</div>`;
 
   for (const b of document.querySelectorAll('[data-filter]'))
     b.onclick = () => { S.filter = b.dataset.filter; renderList(); };
+  /* 같은 칸을 다시 누르면 오름/내림이 뒤집힌다. 다른 칸이면 그 칸에 자연스러운
+     쪽부터 — 날짜·숫자는 큰 것부터, 글자는 가나다순. */
+  for (const h of document.querySelectorAll('[data-sort]')) h.onclick = () => {
+    const k = h.dataset.sort;
+    if (S.sortK === k) S.sortDir = -S.sortDir;
+    else { S.sortK = k; S.sortDir = (k === 'name' || k === 'type' || k === 'state') ? 1 : -1; }
+    renderList();
+  };
   for (const tr of document.querySelectorAll('[data-id]'))
     tr.onclick = () => openPanel(tr.dataset.id);
 
@@ -209,25 +262,34 @@ function renderList() {
   $('#count').innerHTML = `<b>${dl.length}건</b> 수정함 — ${dl.map(f => esc(f.name)).slice(0, 3).join(', ')}${dl.length > 3 ? ' 외' : ''}`;
 }
 
-function rowHtml(f) {
-  const pills = [];
+/* 이 사료에 뭐가 빠졌나. 목록의 상태 칸과 상태 정렬이 같은 걸 본다. */
+function problems(f) {
+  const out = [];
   /* 내려간 사료는 프론트에 안 보인다. 목록에서 눈에 띄게 표시하지 않으면
      '왜 사이트에 안 뜨지' 를 여기서 알아낼 방법이 없다. */
+  if (f.status !== 'published') out.push(['no', '내림 · 프론트에 안 보임']);
+  if (!hasThumb(f)) out.push(['no', '썸네일 없음']);
+  if (!buyOf(f)) out.push(['wa', '구매링크 없음']);
+  if (!analyzed(f)) out.push(['wa', '분석 준비 중']);
+  return out;
+}
+
+function rowHtml(f) {
   const off = f.status !== 'published';
-  if (off) pills.push('<span class="pill no">내림 · 프론트에 안 보임</span>');
-  if (!hasThumb(f)) pills.push('<span class="pill no">썸네일 없음</span>');
-  if (!buyOf(f)) pills.push('<span class="pill wa">구매링크 없음</span>');
-  if (!analyzed(f)) pills.push('<span class="pill wa">분석 준비 중</span>');
+  const pills = problems(f).map(([c, t]) => `<span class="pill ${c}">${t}</span>`);
   if (f.rx) pills.push('<span class="pill ok">처방식</span>');
   if (!pills.length) pills.push('<span class="pill ok">정상</span>');
   return `<tr data-id="${f.id}" class="${isDirty(f) ? 'edited' : ''}" style="${off ? 'opacity:.55' : ''}">
     <td>${hasThumb(f)
       ? `<img class="thumb" src="${esc(f.thumb)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'thumb none',textContent:'?'}))">`
       : `<div class="thumb none">?</div>`}</td>
-    <td><div class="br">${esc(f.brand)}</div><div class="nm">${esc(f.name)}</div></td>
-    <td>${TYPE_KO[f.type] || esc(f.type || '')}</td>
+    <td><div class="br">${esc(f.brand)}</div><div class="nm">${esc(f.name)}</div>
+      <div class="br when-inline">등록 ${ymd(regAt(f)) ?? '—'} · 수정 ${ymd(modAt(f)) ?? '—'}</div></td>
+    <td class="c-type">${TYPE_KO[f.type] || esc(f.type || '')}</td>
     <td class="num">${f.price?.p ? won(f.price.p) + '원' : '—'}<div class="br">${f.price?.wg ? f.price.wg + 'g' : ''}</div></td>
-    <td class="num">${f.price?.pKg ? won(f.price.pKg) : '—'}</td>
+    <td class="num c-pkg">${f.price?.pKg ? won(f.price.pKg) : '—'}</td>
+    ${whenCell(regAt(f), 'c-reg')}
+    ${whenCell(modAt(f), 'c-mod')}
     <td>${pills.join(' ')}</td>
   </tr>`;
 }
@@ -857,6 +919,7 @@ async function commit() {
 
   const btn = $('#commit');
   btn.disabled = true; btn.textContent = '커밋 중…';
+  let rollback = null;   // catch 에서도 보여야 한다
   try {
     /* putFile 은 파일 sha 를 같이 보내서, 그 사이 누가 data.js 를 고쳤으면 409 로
        막아 줬다. commitFiles 는 브랜치 머리만 본다 — 남이 올린 data.js 를 통째로
@@ -866,6 +929,16 @@ async function commit() {
       toast('그 사이 다른 곳에서 data.js 가 바뀌었어요 — 새로고침한 뒤 다시 고쳐주세요', true);
       return;
     }
+
+    /* 최종수정일은 이번에 실제로 손댄 것에만 찍는다. 전부 찍으면 목록의
+       '최종수정' 칸이 죄다 같은 날짜가 돼서 아무것도 알려주지 못한다.
+       커밋이 성공해야 진짜 수정된 것이니, 파일에 담을 값과 화면에 반영할
+       값을 같은 시각으로 잡아 두고 성공한 뒤에 S.foods 에 옮긴다. */
+    const now = new Date().toISOString();
+    const wasSrc = dl.map(f => f.src);
+    for (const f of dl) f.src = { ...(f.src ?? {}), updatedAt: now };
+    /* 커밋이 실패하면 되돌린다 — 안 올라간 수정에 날짜가 찍혀 있으면 거짓말이다 */
+    rollback = () => dl.forEach((f, i) => { f.src = wasSrc[i]; });
 
     const files = [{ path: PATH, text: serialize() }];
 
@@ -889,6 +962,7 @@ async function commit() {
     toast(`커밋했어요 — ${commit.sha.slice(0, 7)}. 몇 분 뒤 사이트에 반영돼요`);
     render();
   } catch (e) {
+    rollback?.();
     toast(e.message, true);
   } finally {
     btn.disabled = false; btn.textContent = 'GitHub 에 커밋';
