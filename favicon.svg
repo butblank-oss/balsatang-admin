@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="발사탕 어드민">
+  <!-- 어드민 — 앱과 한눈에 갈라져야 한다. 탭을 여럿 띄워 놓고 쓰는 화면이라
+       색부터 다르게 잡았다: 앱은 보라 바탕에 흰 발, 어드민은 어두운 바탕에
+       파란 체크(심사). 16px 에서도 두 개가 헷갈리지 않는다. -->
+  <rect width="64" height="64" rx="15" fill="#151922"/>
+  <rect x="1.25" y="1.25" width="61.5" height="61.5" rx="13.75" fill="none" stroke="#2F6FED" stroke-width="2.5"/>
+  <path d="M17 33.5 27.5 44 47 21" fill="none" stroke="#2F6FED" stroke-width="8"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

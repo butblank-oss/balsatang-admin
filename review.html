@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="./favicon.svg">
 <title>발사탕 · 발행 심사</title>
 <style>
 :root{--bg:#0D0F14;--panel:#151922;--panel2:#1B2029;--line:#252B38;--ink:#E8EBF0;--sub:#949FB3;--muted:#838DA3;
@@ -122,6 +123,17 @@ tr.diff td:first-child{color:var(--bad);font-weight:600}
 .labtab{width:100%;margin-top:10px;border-collapse:collapse;font-size:12px}
 .labtab td{padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top}
 .labtab td:first-child{width:82px;color:var(--sub);white-space:nowrap}
+/* 제품명 — 카드에서 제일 먼저 손대는 칸이라 맨 위에 눈에 띄게 둔다 */
+.namebox{margin-bottom:14px;padding:12px 14px;border:1px solid var(--line);
+  background:var(--panel2);border-radius:var(--r)}
+.namebox.ch{border-color:var(--warn);background:var(--warn-soft)}
+.namebox label{display:block;font-size:11.5px;font-weight:600;color:var(--sub);margin-bottom:6px}
+.namebox label .d{font-weight:500;color:var(--muted)}
+.namebox input{width:100%;padding:9px 11px;border-radius:var(--r);background:var(--panel);
+  border:1px solid var(--line);font-size:14px;font-weight:600}
+.namebox input:focus{outline:none;border-color:var(--pri)}
+.namebox .d{font-size:11px;color:var(--muted)}
+.namebox b{color:var(--ink2)}
 .thumbprev{display:flex;align-items:center;gap:10px;margin-top:8px;padding:8px;
   background:var(--panel2);border:1px solid var(--line);border-radius:var(--r)}
 .thumbprev img{width:56px;height:56px;object-fit:contain;background:#fff;border-radius:6px}
@@ -246,12 +258,6 @@ try{Object.assign(edits,JSON.parse(localStorage.getItem(LS_KEY)||'{}'));}catch{}
 const saveEdits=()=>{try{localStorage.setItem(LS_KEY,JSON.stringify(edits));}catch{}};
 
 const FIELD=[
-  /* 제품명은 고칠 수 있어야 한다. 카탈로그 이름이 그대로 들어오는데, 한 라인에
-     맛만 다른 제품이 여럿이면 그 이름으로는 어느 봉지인지 구분이 안 된다.
-     이름은 '매대에서 그 봉지를 집을 수 있는 만큼' 이어야 한다 — 용량은 뺀다
-     (용량은 판매 용량 칸이 따로 있다). */
-  {k:'meta.name',        label:'제품명',            type:'text',wide:true,
-   placeholder:'예) 그레인프리 오븐베이크드 닭고기 어덜트'},
   {k:'facts.protein',    label:'조단백 (%)',        type:'num',step:'0.1'},
   {k:'facts.dmCarb',     label:'건물기준 탄수 (%)',  type:'num',step:'0.1'},
   {k:'facts.firstIngrCat',label:'1번 원료',          type:'sel',
@@ -389,6 +395,28 @@ function sourceBlock(it){
       ${quotes.map(([k,e])=>`<div class="quote"><b>${esc(evLabel(k))}</b>${esc(e.quote)}</div>`).join('')}
     </div>`;
   }).join('') || '<div class="msg f">출처가 없습니다</div>';
+}
+
+/* ── 제품명 ──
+   카탈로그 이름이 그대로 들어온다. '아카나 시니어' 처럼 라인 이름만 오는데,
+   실제로는 닭·칠면조처럼 맛이 여럿이라 그 이름으로는 어느 봉지인지 알 수 없다.
+   심사하면서 바로 고칠 수 있어야 해서 카드 맨 위에 둔다.
+
+   이름은 '매대에서 그 봉지를 집을 수 있는 만큼'(DATA-POLICY 3.8) —
+   라인 + 레시피(주재료) + 대상. 용량과 브랜드는 넣지 않는다. */
+function nameBox(it){
+  const cur=edits[it.stagingId]?.meta?.name;
+  const orig=it.proposed?.name??'';
+  const val=cur!==undefined?cur:orig;
+  const changed=cur!==undefined&&cur!==orig;
+  return `<div class="namebox${changed?' ch':''}">
+    <label>제품명 <span class="d">— 브랜드 <b>${esc(it.proposed?.brand??'')}</b> 뒤에 붙습니다. 용량은 넣지 마세요</span></label>
+    <input data-edit="meta.name" value="${esc(val)}" placeholder="예) 시니어 닭고기"
+      autocapitalize="off" autocomplete="off" spellcheck="false">
+    <div class="d" style="margin-top:5px">${changed
+      ? `원래 <b>${esc(orig)}</b> → 발행되면 <b>${esc(it.proposed?.brand??'')} ${esc(val)}</b>`
+      : `발행되면 <b>${esc(it.proposed?.brand??'')} ${esc(val)}</b> 로 올라갑니다`}</div>
+  </div>`;
 }
 
 /* ── 라벨 붙여넣기 ──
@@ -566,6 +594,7 @@ function card(it){
       </div>
     </div>
     <div class="body">
+      ${nameBox(it)}
       <div class="gatemsg">
       ${G.draft?`<div class="msg w"><b>자료 수집 중</b> — 카탈로그에서 기본 정보만 가져온 상태예요.
          아래 <b>라벨 붙여넣기</b>에 라벨을 넣으면 채점이 돌아갑니다.<br>${
@@ -647,13 +676,30 @@ function patchCard(id){
   if(!ed&&mark)mark.remove();
 
   for(const input of el.querySelectorAll('[data-edit]')){
+    /* 제품명 칸은 '고치기' 격자 밖(카드 맨 위)에 있어 .f 래퍼가 없다.
+       예전엔 여기서 null 을 건드려 patchCard 가 통째로 멈췄고, 이름을 고쳐도
+       카드 제목이 그대로였다. 래퍼가 있는 칸만 표시를 갱신한다. */
     const f=input.closest('.f');
+    if(!f)continue;
     const [grp,key]=input.dataset.edit.split('.');
     const cur=edits[id]?.[grp]?.[key];
     const orig=grp==='meta'?dig(it.proposed,key):dig(it.proposed,input.dataset.edit);
     const changed=cur!==undefined&&cur!==orig;
     f.classList.toggle('ch',changed);
     f.querySelector('.was').textContent=changed?'원래 '+(orig??'—'):'';
+  }
+
+  /* 제품명 칸의 안내와 노란 테두리 */
+  const nb=el.querySelector('.namebox');
+  if(nb){
+    const cur=edits[id]?.meta?.name;
+    const orig=it.proposed?.name??'', brand=it.proposed?.brand??'';
+    const val=cur!==undefined?cur:orig;
+    const changed=cur!==undefined&&cur!==orig;
+    nb.classList.toggle('ch',changed);
+    nb.querySelector(':scope > .d').innerHTML=changed
+      ? `원래 <b>${esc(orig)}</b> → 발행되면 <b>${esc(brand)} ${esc(val)}</b>`
+      : `발행되면 <b>${esc(brand)} ${esc(val)}</b> 로 올라갑니다`;
   }
 
   const d=derived(it), o=it.proposed||{};
