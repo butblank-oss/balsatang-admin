@@ -239,6 +239,12 @@ try{Object.assign(edits,JSON.parse(localStorage.getItem(LS_KEY)||'{}'));}catch{}
 const saveEdits=()=>{try{localStorage.setItem(LS_KEY,JSON.stringify(edits));}catch{}};
 
 const FIELD=[
+  /* 제품명은 고칠 수 있어야 한다. 카탈로그 이름이 그대로 들어오는데, 한 라인에
+     맛만 다른 제품이 여럿이면 그 이름으로는 어느 봉지인지 구분이 안 된다.
+     이름은 '매대에서 그 봉지를 집을 수 있는 만큼' 이어야 한다 — 용량은 뺀다
+     (용량은 판매 용량 칸이 따로 있다). */
+  {k:'meta.name',        label:'제품명',            type:'text',wide:true,
+   placeholder:'예) 그레인프리 오븐베이크드 닭고기 어덜트'},
   {k:'facts.protein',    label:'조단백 (%)',        type:'num',step:'0.1'},
   {k:'facts.dmCarb',     label:'건물기준 탄수 (%)',  type:'num',step:'0.1'},
   {k:'facts.firstIngrCat',label:'1번 원료',          type:'sel',
@@ -275,7 +281,8 @@ function effective(it){
 function isEdited(it){
   const e=edits[it.stagingId];
   if(!e)return false;
-  return Object.keys(e.facts||{}).length>0||Object.keys(e.price||{}).length>0||!!e.label;
+  return Object.keys(e.facts||{}).length>0||Object.keys(e.price||{}).length>0
+       ||Object.keys(e.meta||{}).length>0||!!e.label;
 }
 
 /* ── 라벨을 채운 뒤의 항목 ──
@@ -300,7 +307,14 @@ function gateNow(it){
   try{ r=GATE1.checkItem(m,[],new Set()); }
   catch(err){ return {fail:[{msg:'게이트 검사 중 오류: '+err.message}],warn:[],
                       draft:false,pending,ready:false}; }
-  return {...r,draft:false,pending,ready:r.fail.length===0};
+  /* 이름과 라벨이 어긋나면 알린다. 막지는 않는다 — '프리런 덕' 처럼 이름이
+     레시피명인 경우도 있어 사람이 판단해야 한다. 다만 조용히 넘기면
+     '닭고기 사료' 라고 적힌 소고기 사료가 그대로 나간다. */
+  const fc=LABEL.flavorCheck(m.proposed.name, m.proposed.ingredients||[]);
+  const warn=[...r.warn];
+  if(fc)warn.unshift({msg:`제품명은 '${fc.missing.join('·')}' 인데 라벨 앞 원료엔 없습니다 `+
+    `(${fc.head.slice(0,3).join(', ')}). 다른 맛의 라벨을 붙여넣었는지, 제품명을 고쳐야 하는지 봐주세요`});
+  return {...r,warn,draft:false,pending,ready:r.fail.length===0};
 }
 /* 지금 화면이 주장하는 별점. 값을 합치고 점수를 매기는 일은 publish.js 가 이미
    하므로 그 결과를 그대로 읽는다. 여기서 또 계산하면 화면과 발행 결과가 갈린다 —
@@ -407,7 +421,8 @@ function editBlock(it){
   const id=it.stagingId, e=edits[id]||{};
   const fields=FIELD.map(f=>{
     const [grp,key]=f.k.split('.');
-    const orig=dig(it.proposed,f.k);
+    /* meta.* 는 proposed 바로 아래 값이다 (meta.name → proposed.name) */
+    const orig=grp==='meta'?dig(it.proposed,key):dig(it.proposed,f.k);
     const cur=e[grp]?.[key];
     const val=cur!==undefined?cur:orig;
     const changed=cur!==undefined&&cur!==orig;
@@ -615,7 +630,7 @@ function patchCard(id){
     const f=input.closest('.f');
     const [grp,key]=input.dataset.edit.split('.');
     const cur=edits[id]?.[grp]?.[key];
-    const orig=dig(it.proposed,input.dataset.edit);
+    const orig=grp==='meta'?dig(it.proposed,key):dig(it.proposed,input.dataset.edit);
     const changed=cur!==undefined&&cur!==orig;
     f.classList.toggle('ch',changed);
     f.querySelector('.was').textContent=changed?'원래 '+(orig??'—'):'';
@@ -655,6 +670,11 @@ function patchCard(id){
     ].join('');
   }
 
+  /* 이름을 고쳤으면 카드 제목도 바뀌어야 한다. 안 그러면 접었을 때 옛 이름이
+     보여서 무엇을 발행하는지 헷갈린다. */
+  const mp=merged(it).proposed;
+  el.querySelector('.t b').textContent=`${mp.brand} ${mp.name}`;
+
   const b1=el.querySelector('.b-g1');
   if(b1){
     b1.className='b b-g1 '+(g.draft||g.pending?'wa':g.ready?'ok':'no');
@@ -667,9 +687,10 @@ function patchCard(id){
 function setEdit(id,path,raw){
   const it=itemById(id); if(!it)return;
   const [grp,key]=path.split('.');
-  const orig=dig(it.proposed,path);
+  const orig=grp==='meta'?dig(it.proposed,key):dig(it.proposed,path);
   let val=raw;
-  const isText = path==='facts.firstIngrCat' || path===BUY_FIELD || path==='price.srcUrl';
+  const isText = path==='facts.firstIngrCat' || path===BUY_FIELD
+              || path==='price.srcUrl' || path.startsWith('meta.');
   if(path==='price.wgOptions'){
     /* '2000, 6000, 11400' → [2000,6000,11400]. 게이트가 최소 용량인지 볼 때 쓴다. */
     const list=String(raw).split(/[,\s]+/).map(s=>Number(s)).filter(n=>n>0);
