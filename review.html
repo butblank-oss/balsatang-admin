@@ -14,6 +14,9 @@ body{background:var(--bg);color:var(--ink);font-family:'Pretendard',-apple-syste
   font-size:14px;line-height:1.5;padding-bottom:120px;-webkit-font-smoothing:antialiased}
 a{color:var(--pri-ink);text-decoration:none}
 a:hover{text-decoration:underline}
+/* 브라우저 기본 스타일이 입력칸 글자를 검게 칠한다. 어두운 배경이라 안 보였다 —
+   라벨 붙여넣기 칸이 통째로 까만 글씨였다. 물려받게 해 둔다. */
+button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit;letter-spacing:inherit}
 code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
 
 .top{position:sticky;top:0;z-index:20;background:rgba(13,15,20,.92);backdrop-filter:blur(8px);
@@ -119,6 +122,10 @@ tr.diff td:first-child{color:var(--bad);font-weight:600}
 .labtab{width:100%;margin-top:10px;border-collapse:collapse;font-size:12px}
 .labtab td{padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top}
 .labtab td:first-child{width:82px;color:var(--sub);white-space:nowrap}
+.thumbprev{display:flex;align-items:center;gap:10px;margin-top:8px;padding:8px;
+  background:var(--panel2);border:1px solid var(--line);border-radius:var(--r)}
+.thumbprev img{width:56px;height:56px;object-fit:contain;background:#fff;border-radius:6px}
+.thumbprev .d{color:var(--muted);font-size:11px}
 .calc{margin-top:9px;padding:9px;border:1px dashed var(--line);border-radius:var(--r)}
 .calc .r{display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end}
 .calc .r .f{flex:1;min-width:66px}
@@ -257,10 +264,22 @@ const FIELD=[
      확인한 용량을 다 적어야 게이트가 최소값인지 볼 수 있다. */
   {k:'price.wgOptions',  label:'판매 용량 (g, 쉼표)', type:'text',
    placeholder:'2000, 6000, 11400'},
-  /* 가격 근거가 될 쿠팡 상품 페이지. 파트너스 단축링크는 근거가 못 된다 —
-     어느 상품인지 주소만 봐서는 알 수 없기 때문이다. */
-  {k:'price.srcUrl',     label:'쿠팡 상품 페이지 (가격 근거)', type:'text', wide:true,
-   placeholder:'https://www.coupang.com/vp/products/…'}
+  /* 열량은 라벨에만 있다. 급여량 계산이 이 값으로 돌아간다 — 없으면 상세 화면의
+     '하루 몇 g' 이 안 나온다. 라벨에서 읽은 값을 보여 주고 고칠 수 있게 둔다. */
+  {k:'meta.kcalPerKg',   label:'열량 (kcal/kg)',    type:'num',step:'1'},
+  /* 썸네일. 다나와 사진이 엉뚱한 제품일 때가 있어 직접 넣을 수 있어야 한다. */
+  {k:'meta.thumb',       label:'썸네일 이미지 주소',  type:'text', wide:true,
+   placeholder:'https://… .jpg'},
+  /* ── 쿠팡 주소는 두 개다. 쓰임이 달라서 한 칸에 넣으면 안 된다 ──
+     가격 근거 : www.coupang.com/vp/products/1234…  상품 페이지. 어느 상품의
+       얼마인지 확인할 수 있어야 근거가 된다. 게이트가 이 형식을 검사한다.
+     구매 링크 : link.coupang.com/a/…  파트너스 단축링크. 사용자가 누르는 버튼이고
+       이 링크로 들어온 구매에만 수수료가 붙는다. 주소만 봐서는 어느 상품인지
+       알 수 없어 근거로는 쓸 수 없다. */
+  {k:'price.srcUrl',     label:'가격 근거 · 쿠팡 상품 페이지', type:'text', wide:true,
+   placeholder:'https://www.coupang.com/vp/products/6595020969'},
+  {k:'price.buyUrl',     label:'구매 버튼 링크 · 쿠팡 파트너스', type:'text', wide:true,
+   placeholder:'https://link.coupang.com/a/…'}
 ];
 
 /* 구매 링크는 숫자가 아니라 따로 다룬다. 쿠팡 파트너스 링크로만 수수료가 붙으므로
@@ -416,6 +435,31 @@ function labelSummary(L){
          `<span class="p ${x.safe==='caution'||x.safe==='danger'?'ch':''}">${esc(x.name)}</span>`).join(' ')}</div></details>`:''}`;
 }
 
+/* ── 두 쿠팡 주소를 헷갈리지 않게 ──
+   심사자가 파트너스 단축링크를 '가격 근거' 칸에 넣었다. 형식만 보고 게이트가
+   막긴 하는데, 왜 막히는지 그 자리에서 알려주는 게 낫다. */
+function urlHint(it){
+  const m=merged(it).proposed;
+  const src=m.price?.srcUrl??edits[it.stagingId]?.price?.srcUrl??'';
+  const buy=m.price?.buyUrl??'';
+  const isProduct=/^https?:\/\/([\w-]+\.)*coupang\.com\/vp\/products\/\d+/i.test(src);
+  const isShort=/link\.coupang\.com\/a\//i.test(src);
+  const buyOk=/^https?:\/\/([\w-]+\.)*coupang\.com\//i.test(buy);
+  const rows=[];
+  if(src&&isShort)rows.push(['f',
+    '가격 근거 칸에 <b>파트너스 단축링크</b>가 들어 있습니다. 이 주소만으로는 어느 상품의 얼마인지 확인할 수 없어 근거가 못 됩니다. '+
+    '링크를 브라우저에서 열면 <code>www.coupang.com/vp/products/…</code> 로 바뀌는데, 그 주소를 넣어주세요. 지금 주소는 아래 <b>구매 버튼 링크</b> 칸이 맞는 자리입니다.']);
+  else if(src&&!isProduct)rows.push(['f','가격 근거는 쿠팡 상품 페이지(<code>/vp/products/…</code>)여야 합니다.']);
+  else if(src)rows.push(['ok','가격 근거 · 쿠팡 상품 페이지 확인']);
+  if(buy&&!buyOk)rows.push(['f','구매 버튼 링크가 쿠팡 도메인이 아닙니다.']);
+  else if(!buy)rows.push(['w','구매 버튼 링크가 없습니다 — 이 링크로 들어온 구매에만 수수료가 붙습니다.']);
+  const thumb=m.thumb;
+  return `${rows.map(([k,t])=>`<div class="msg ${k==='ok'?'':k}"${k==='ok'?' style="border-color:#1e4a2a;background:var(--good-soft);color:#86EFAC"':''}>${t}</div>`).join('')}
+    ${thumb?`<div class="thumbprev"><img src="${esc(thumb)}" alt=""
+        onerror="this.closest('.thumbprev').innerHTML='<span class=d>썸네일 주소를 열지 못했습니다 — 주소를 확인해 주세요</span>'">
+      <span class="d">썸네일 미리보기</span></div>`:''}`;
+}
+
 /* 값을 고치는 칸. 원본과 달라지면 노란 테두리와 '원래 N' 표시가 붙는다. */
 function editBlock(it){
   const id=it.stagingId, e=edits[id]||{};
@@ -449,29 +493,17 @@ function editBlock(it){
     `<span class="p ${cls} ${now!==before?'ch':''}">${esc(label)} ${esc(now??'—')}${
       now!==before?` <s style="opacity:.6">${esc(before??'—')}</s>`:''}</span>`;
 
-  const buyOrig=dig(it.proposed,BUY_FIELD)??'';
-  const buyCur=e.price?.buyUrl;
-  const buyVal=buyCur!==undefined?buyCur:buyOrig;
-  const buyOk=/^https?:\/\/([\w-]+\.)*coupang\.com\//i.test(String(buyVal||''));
-  const buyBlock=it.pricePending?'':`<div class="buy${buyVal?(buyOk?' ok':' bad'):''}">
-    <label>구매 링크 (쿠팡 파트너스)</label>
-    <input data-buy placeholder="https://link.coupang.com/a/…"
-      value="${esc(buyVal)}" autocapitalize="off" autocomplete="off" spellcheck="false">
-    <div class="buymsg">${
-      !buyVal ? '⚠ 아직 없음 — 이 링크로 들어온 구매만 수수료가 붙습니다. 아래 상품 페이지에서 만들어 붙여넣으세요.'
-      : buyOk ? '✓ 쿠팡 링크' : '✗ 쿠팡 도메인이 아닙니다'}</div>
-    ${(it.sources||[]).filter(s=>s.role==='retail').map(s=>
-      `<a class="buysrc" href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">링크 만들 상품 페이지 열기 ↗</a>`).join('')}
-  </div>`;
-
   return `<div class="sec">${labelBox(it)}<h3>고치기</h3>
     <div class="edit">${fields}</div>
-    ${buyBlock}
+    ${urlHint(it)}
     ${(() => {
       /* 조단백은 위 '고치기' 에 이미 칸이 있다. 여기 또 두면 같은 값을 두 번 묻는 꼴이라
          어느 쪽이 진짜인지 알 수 없다. 위 칸을 그대로 읽어 쓰고, 나머지 셋만 받는다.
-         값은 라벨에서 온 ga 로 미리 채운다 — 다시 적으라는 게 아니라 확인하라는 뜻이다. */
-      const g = it.proposed?.ga || {};
+
+         값은 '라벨을 반영한 뒤' 의 ga 로 채운다. 예전엔 원본(다나와) ga 를 읽어서,
+         라벨에서 조지방·조섬유·수분을 다 읽어 놓고도 칸이 비어 있었다.
+         그래서 못 읽은 것처럼 보였다 — 실제로는 읽어서 탄수까지 계산한 상태였다. */
+      const g = merged(it).proposed?.ga || {};
       const cell = (k, l) => `<div class="f"><label>${l}</label>
         <input type="number" step="0.1" data-calc="${k}" value="${g[k] == null ? '' : esc(g[k])}"></div>`;
       return `<div class="calc">
@@ -614,18 +646,6 @@ function patchCard(id){
   if(ed&&!mark)badges.insertAdjacentHTML('beforeend','<span class="b ed">수정됨</span>');
   if(!ed&&mark)mark.remove();
 
-  const buyBox=el.querySelector('.buy');
-  if(buyBox){
-    const cur=edits[id]?.price?.buyUrl;
-    const v=cur!==undefined?cur:(dig(it.proposed,BUY_FIELD)??'');
-    const ok=/^https?:\/\/([\w-]+\.)*coupang\.com\//i.test(String(v||''));
-    buyBox.classList.toggle('ok',!!v&&ok);
-    buyBox.classList.toggle('bad',!!v&&!ok);
-    buyBox.querySelector('.buymsg').textContent =
-      !v ? '⚠ 아직 없음 — 이 링크로 들어온 구매만 수수료가 붙습니다. 아래 상품 페이지에서 만들어 붙여넣으세요.'
-      : ok ? '✓ 쿠팡 링크' : '✗ 쿠팡 도메인이 아닙니다';
-  }
-
   for(const input of el.querySelectorAll('[data-edit]')){
     const f=input.closest('.f');
     const [grp,key]=input.dataset.edit.split('.');
@@ -690,7 +710,7 @@ function setEdit(id,path,raw){
   const orig=grp==='meta'?dig(it.proposed,key):dig(it.proposed,path);
   let val=raw;
   const isText = path==='facts.firstIngrCat' || path===BUY_FIELD
-              || path==='price.srcUrl' || path.startsWith('meta.');
+              || path==='price.srcUrl' || path==='meta.name' || path==='meta.thumb';
   if(path==='price.wgOptions'){
     /* '2000, 6000, 11400' → [2000,6000,11400]. 게이트가 최소 용량인지 볼 때 쓴다. */
     const list=String(raw).split(/[,\s]+/).map(s=>Number(s)).filter(n=>n>0);
@@ -720,8 +740,6 @@ function setEdit(id,path,raw){
 document.addEventListener('change',e=>{
   const f=e.target.closest('[data-edit]');
   if(f){setEdit(f.closest('.card').dataset.id,f.dataset.edit,f.value);return;}
-  const bu=e.target.closest('[data-buy]');
-  if(bu){setEdit(bu.closest('.card').dataset.id,BUY_FIELD,bu.value.trim());return;}
   const r=e.target.closest('[data-reason]');
   if(r){
     const id=r.closest('.card').dataset.id;
@@ -759,7 +777,19 @@ function readLabel(card){
     if(f[k]!==undefined)continue;                 /* 사람이 이미 고친 칸은 둔다 */
     if(v!==dig(it.proposed,'facts.'+k))f[k]=v;
   }
-  if(r.buyUrl){ const p=e.price||(e.price={}); if(p.buyUrl===undefined)p.buyUrl=r.buyUrl; }
+  /* 라벨에서 읽은 값을 고치기 칸에도 넣는다. 안 넣으면 읽어 놓고도 칸이 비어 있어
+     '못 읽었다' 로 보인다 — 실제로 그렇게 보였다. 사람이 이미 고친 칸은 안 건드린다. */
+  const meta=e.meta||(e.meta={});
+  if(r.kcalPerKg!=null&&meta.kcalPerKg===undefined&&r.kcalPerKg!==it.proposed?.kcalPerKg)
+    meta.kcalPerKg=r.kcalPerKg;
+  if(r.thumb&&meta.thumb===undefined&&r.thumb!==it.proposed?.thumb)meta.thumb=r.thumb;
+  if(!Object.keys(meta).length)delete e.meta;
+  const pr=e.price||(e.price={});
+  if(r.buyUrl&&pr.buyUrl===undefined)pr.buyUrl=r.buyUrl;
+  if(r.productUrl&&pr.srcUrl===undefined)pr.srcUrl=r.productUrl;
+  if(r.wgOptions.length&&pr.wgOptions===undefined)pr.wgOptions=r.wgOptions;
+  if(r.price&&pr.p===undefined){pr.p=r.price.p;pr.wg=r.price.wg;}
+  if(!Object.keys(pr).length)delete e.price;
   saveEdits();
   render();
   toast(`읽었습니다 — 원료 ${r.ingredients.length}종${r.unknown.length?` (모르는 원료 ${r.unknown.length}개)`:''}`);

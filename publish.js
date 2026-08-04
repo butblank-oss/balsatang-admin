@@ -49,13 +49,6 @@ const PUB = {
     const p = JSON.parse(JSON.stringify(item.proposed));
     let sources = item.sources || [], evidence = { ...(item.evidence || {}) };
 
-    /* 제품명 — 카탈로그 이름이 그대로 들어오는데, 한 라인에 맛만 다른 제품이
-       여럿이면 그 이름으로는 어느 봉지인지 구분이 안 된다. 심사자가 고칠 수 있다.
-       이름이 바뀌면 중복 검사(브랜드+제품명)도 새 이름으로 다시 걸린다. */
-    for (const [k, v] of Object.entries(edit.meta || {})) {
-      if (v != null && String(v).trim()) p[k] = String(v).trim();
-    }
-
     /* ── 라벨 판독 ──
        심사자가 라벨을 붙여넣어 원료와 보장성분이 들어왔으면, 막고 있던 이유가
        사라졌으므로 '자료 수집 중'(draft)을 푼다. 라벨은 그 자체가 A등급 출처다
@@ -80,6 +73,15 @@ const PUB = {
       q('facts.firstIngrCat', `원료 표기 1번: ${L.ingredients[0] ?? '—'}`);
       q('facts.cautionN', `원료 ${L.ingredients.length}종 중 주의 ${L.dist?.caution ?? '?'}종`);
       q('facts.dangerN', `위험 ${L.dist?.danger ?? 0}종`);
+    }
+
+    /* 제품명·열량·썸네일 — 심사자가 직접 넣은 값. 라벨 판독보다 뒤에 둔다.
+       사람이 고쳐 놓은 걸 라벨이 도로 덮으면 고칠 방법이 없어진다. */
+    /* meta 는 proposed 바로 아래 값들이다 — 제품명·열량·썸네일.
+       열량은 숫자다. 문자열로 넣으면 급여량 계산이 조용히 어긋난다. */
+    for (const [k, v] of Object.entries(edit.meta || {})) {
+      if (v == null || String(v).trim() === '') continue;
+      p[k] = k === 'kcalPerKg' ? Number(v) : String(v).trim();
     }
 
     Object.assign(p.facts ??= {}, edit.facts || {});
