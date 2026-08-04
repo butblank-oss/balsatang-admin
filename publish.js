@@ -47,22 +47,82 @@ const PUB = {
   applyEdits(item, edit) {
     if (!edit) return item;
     const p = JSON.parse(JSON.stringify(item.proposed));
+    let sources = item.sources || [], evidence = { ...(item.evidence || {}) };
+
+    /* ── 라벨 판독 ──
+       심사자가 라벨을 붙여넣어 원료와 보장성분이 들어왔으면, 막고 있던 이유가
+       사라졌으므로 '자료 수집 중'(draft)을 푼다. 라벨은 그 자체가 A등급 출처다
+       (DATA-POLICY 3.1) — 사료관리법이 표기를 강제하는 1차 자료다.
+       근거 문장도 같이 남긴다. 없으면 게이트가 '근거 누락' 으로 막는다. */
+    const L = edit.label;
+    if (L) {
+      p.ingredients = L.ingredients;
+      p.ga = { ...(p.ga || {}), ...L.ga };
+      if (L.kcalPerKg != null) p.kcalPerKg = L.kcalPerKg;
+      if (L.thumb) p.thumb = L.thumb;
+      delete p.draft;
+
+      const i = sources.length;
+      sources = [...sources, {
+        role: 'label', url: L.srcUrl || sources[0]?.url || '',
+        fetchedAt: L.at, title: '제품 라벨 판독 (심사 화면에서 사람이 입력)'
+      }];
+      evidence = { ...evidence };
+      const q = (k, text) => { evidence[k] = { src: i, quote: text }; };
+      q('facts.protein', `라벨 보장성분 — 조단백 ${L.ga.protein}%`);
+      q('facts.firstIngrCat', `원료 표기 1번: ${L.ingredients[0] ?? '—'}`);
+      q('facts.cautionN', `원료 ${L.ingredients.length}종 중 주의 ${L.dist?.caution ?? '?'}종`);
+      q('facts.dangerN', `위험 ${L.dist?.danger ?? 0}종`);
+    }
+
     Object.assign(p.facts ??= {}, edit.facts || {});
-    Object.assign(p.price ??= {}, edit.price || {});
-    if (p.price.p > 0 && p.price.wg > 0) p.price.pKg = Math.round(p.price.p / p.price.wg * 1000);
+    if (L) evidence['facts.dmCarb'] = { src: sources.length - 1,
+      quote: `조단백 ${L.ga.protein} / 조지방 ${L.ga.fat} / 조섬유 ${L.ga.fiber} / 수분 ${L.ga.moisture} → 건물기준 탄수 ${p.facts.dmCarb}%` };
+
+    /* 가격이 들어왔으면 보류를 푼다. 가격이 없으면 pricePending 을 유지해야 한다 —
+       게이트가 'pricePending 인데 price 가 있다' 로 탈락시킨다. */
+    const priceIn = { ...(edit.price || {}) };
+    const buyUrl = priceIn.buyUrl;
+    const srcUrl = priceIn.srcUrl;
+    delete priceIn.buyUrl; delete priceIn.srcUrl;
+    if (p.pricePending && priceIn.p > 0 && priceIn.wg > 0) delete p.pricePending;
+    if (!p.pricePending) {
+      Object.assign(p.price ??= {}, priceIn);
+      if (buyUrl) p.price.buyUrl = buyUrl;
+      p.price.shop ??= 'coupang';
+      if (p.price.p > 0 && p.price.wg > 0) p.price.pKg = Math.round(p.price.p / p.price.wg * 1000);
+      /* 가격 근거는 쿠팡 상품 페이지여야 한다(DATA-POLICY 3.2). 심사자가 넣은
+         주소를 retail 출처로 더하고, 그 값이 어디서 왔는지 문장으로 남긴다. */
+      const url = srcUrl || sources.find(s => s.role === 'retail')?.url;
+      if (url && !sources.some(s => s.role === 'retail' && s.url === url)) {
+        sources = [...sources, { role: 'retail', url, fetchedAt: new Date().toISOString(),
+                                 title: '쿠팡 상품 페이지 (가격 근거)' }];
+      }
+      const ri = sources.findIndex(s => s.role === 'retail' && s.url === url);
+      if (ri >= 0) evidence['price.p'] = { src: ri,
+        quote: `쿠팡 ${p.price.wg}g ${Number(p.price.p).toLocaleString('ko-KR')}원 (심사 화면에서 사람이 확인)` };
+    }
+
+    const pending = p.pricePending === true;
     p.ratings = {
       ...p.ratings,
       ...ENGINE.rateAll({
         dmCarb: p.facts.dmCarb, protein: p.facts.protein,
         firstIngrCat: p.facts.firstIngrCat,
         cautionN: p.facts.cautionN, dangerN: p.facts.dangerN,
-        pKg: p.price.pKg ?? null
+        pKg: pending ? null : (p.price?.pKg ?? null)
       })
     };
+    if (pending) { p.ratings.value = null; p.score = null; }
+    else if (['quality', 'carb', 'additive', 'value'].every(k => p.ratings[k] != null)) {
+      p.score = ENGINE.computeScore(p.ratings);
+    }
+
     const audit = { ...(item.audit || {}) };
     /* 값이 바뀌었으니 심사 AI 의 대조 결과는 더 이상 이 값에 대한 것이 아니다. */
-    if (Object.keys(edit.facts || {}).length) audit.verdict = null;
-    return { ...item, proposed: p, audit, humanEdit: { ...edit, at: new Date().toISOString() } };
+    if (L || Object.keys(edit.facts || {}).length) audit.verdict = null;
+    return { ...item, proposed: p, sources, evidence, audit,
+             humanEdit: { ...edit, at: new Date().toISOString() } };
   },
 
   /* 실제 발행. decision = { stagingId: 'publish' | 'reject' }, edits = { stagingId: {...} } */
@@ -72,32 +132,39 @@ const PUB = {
     const rejectIds = new Set(Object.entries(decision).filter(([, v]) => v === 'reject').map(([k]) => k));
     if (!approve.size && !rejectIds.size) throw new Error('발행하거나 반려할 항목이 없습니다');
 
-    /* 게이트를 통과한 건만 발행할 수 있다 */
-    const readyBy = {};
-    for (const b of review.batches) for (const it of b.items) readyBy[it.stagingId] = it.ready;
-    const refused = [...approve].filter(id => !readyBy[id]);
-    for (const id of refused) approve.delete(id);
-
     step('저장소 상태 확인');
     const baseSha = await GH.headSha();
 
     step('data.js 읽는 중');
     const data = await GH.getFile(this.DATA);
     const lines = data.text.split('\n');
+    const publishedFoods = JSON.parse(
+      lines.find(l => l.startsWith('const FOODS_ALL=')).slice('const FOODS_ALL='.length).replace(/;\s*$/, ''));
 
     const files = [];
     const published = [], rejected = [], details = {};
     const now = new Date().toISOString();
 
     /* 이미 쓰이고 있는 id 를 피한다 */
-    const usedIds = new Set(JSON.parse(
-      lines.find(l => l.startsWith('const FOODS_ALL=')).slice('const FOODS_ALL='.length).replace(/;\s*$/, '')
-    ).map(f => f.id));
+    const usedIds = new Set(publishedFoods.map(f => f.id));
     const newId = () => {
       let u;
       do { u = crypto.randomUUID(); } while (usedIds.has(u));
       usedIds.add(u);
       return u;
+    };
+
+    /* ── 게이트 ──
+       예전에는 build-review 가 미리 계산해 둔 item.ready 만 봤다. 그래서 심사자가
+       화면에서 라벨을 다 채워도 '자료 수집 중' 상태의 옛 판정에 막혀 발행이 안 됐다.
+       이제 고친 값을 반영한 뒤 게이트를 그 자리에서 다시 돌린다.
+       느슨해지는 게 아니다 — engine/gate1.js 의 같은 checkItem 이고, 여기서는
+       data.js 까지 읽어 중복 검사까지 한다. 화면 미리보기보다 오히려 엄격하다. */
+    const refused = [];
+    const seenKeys = new Set();
+    const gateOk = (item) => {
+      try { return GATE1.checkItem(item, publishedFoods, seenKeys).fail; }
+      catch (e) { return [{ code: 'E_GATE', msg: '게이트 검사 실패: ' + e.message }]; }
     };
 
     step('스테이징 배치 읽는 중');
@@ -118,6 +185,15 @@ const PUB = {
         if (!approve.has(id)) { keep.push(raw); continue; }
 
         const item = this.applyEdits(raw, edits[id]);
+        /* 아직 라벨을 못 본 항목은 검사할 단계가 아니다 — 발행도 될 수 없다. */
+        const fail = item.proposed.draft === true
+          ? [{ code: 'E_DRAFT', msg: '자료 수집 중 — 라벨을 채워야 발행할 수 있습니다' }]
+          : gateOk(item);
+        if (fail.length) {
+          refused.push({ stagingId: id, label: `${item.proposed.brand} ${item.proposed.name}`, fail });
+          keep.push(raw);
+          continue;
+        }
         const { food, detail } = ENGINE.publishRecord(item, newId(), now);
         published.push(food);
         if (detail) details[food.id] = detail;
@@ -129,9 +205,12 @@ const PUB = {
     }
 
     if (!published.length && !rejected.length) {
-      throw new Error(refused.length
-        ? '게이트를 통과하지 않은 건이라 발행하지 않았습니다'
-        : '스테이징에서 해당 항목을 찾지 못했습니다');
+      /* 왜 막혔는지 말해 준다. '게이트 미통과' 만 뜨면 무엇을 고쳐야 할지 알 수 없다. */
+      if (refused.length) {
+        const why = refused.flatMap(r => r.fail.map(f => `· ${r.label}: ${f.msg}`)).slice(0, 4);
+        throw new Error('게이트를 통과하지 못했습니다\n' + why.join('\n'));
+      }
+      throw new Error('스테이징에서 해당 항목을 찾지 못했습니다');
     }
 
     /* data.js 병합 */
@@ -168,7 +247,9 @@ const PUB = {
 
     /* 심사 목록에서 처리한 항목을 뺀다. 안 그러면 발행한 게 계속 대기로 보인다. */
     step('심사 목록 갱신');
-    const done = new Set([...approve, ...rejectIds]);
+    /* 게이트에 막힌 건은 스테이징에 그대로 남겼으니 심사 목록에서도 빼면 안 된다.
+       빼 버리면 화면에서 사라져 다시 손볼 방법이 없어진다. */
+    const done = new Set([...published.map(f => f.src?.stagingId), ...rejectIds]);
     const nextReview = {
       ...review,
       batches: review.batches

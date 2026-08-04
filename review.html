@@ -106,6 +106,19 @@ tr.diff td:first-child{color:var(--bad);font-weight:600}
 .f input:focus,.f select:focus{outline:none;border-color:var(--pri)}
 .f.ch input,.f.ch select{border-color:var(--warn);background:var(--warn-soft)}
 .f .was{font-size:10px;color:var(--warn);min-height:12px}
+/* 라벨 붙여넣기 — 이 화면에서 제일 중요한 칸이라 눈에 띄게 둔다 */
+.lab{margin-bottom:14px;padding:12px;border:1px solid var(--pri);background:var(--pri-soft);border-radius:var(--r)}
+.lab.ok{border-color:var(--good);background:var(--good-soft)}
+.lab textarea{width:100%;margin-top:8px;padding:9px 11px;border-radius:var(--r);resize:vertical;
+  background:var(--panel2);border:1px solid var(--line);font-size:12.5px;line-height:1.6}
+.lab textarea:focus{outline:none;border-color:var(--pri)}
+.labact{display:flex;gap:6px;margin-top:8px}
+.labact button{padding:8px 14px;border-radius:var(--r);border:1px solid var(--pri);
+  background:var(--pri);color:#fff;font-weight:600;font-size:12.5px}
+.labact button.ghost{background:transparent;border-color:var(--line);color:var(--sub);font-weight:500}
+.labtab{width:100%;margin-top:10px;border-collapse:collapse;font-size:12px}
+.labtab td{padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.labtab td:first-child{width:82px;color:var(--sub);white-space:nowrap}
 .calc{margin-top:9px;padding:9px;border:1px dashed var(--line);border-radius:var(--r)}
 .calc .r{display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end}
 .calc .r .f{flex:1;min-width:66px}
@@ -187,7 +200,10 @@ window.APP_BASE = (function () {
   try { var o = localStorage.getItem('balsatang.appBase'); if (o) return o; } catch (e) { }
   return /(^|\.)balsatang\.com$/.test(location.hostname) ? 'https://balsatang.com/' : '../app/';
 })();
-document.write(['engine/dict.js', 'engine/phrases.js', 'engine/engine.js']
+/* policy·gate1·label 도 앱 쪽 engine/ 에 있다. 게이트 검사와 라벨 판독을
+   Node 스크립트와 똑같은 코드로 돌리기 위해서다 — 옮겨 적으면 어긋난다. */
+document.write(['engine/dict.js', 'engine/phrases.js', 'engine/engine.js',
+                'engine/policy.js', 'engine/gate1.js', 'engine/label.js']
   .map(function (f) { return '<scr' + 'ipt src="' + window.APP_BASE + f + '"><\/scr' + 'ipt>'; }).join(''));
 </script>
 <script src="github.js"></script>
@@ -201,7 +217,7 @@ const EV_LABEL={'price.p':'가격','price.wg':'중량','facts.protein':'조단�
 const FACT_LABEL={protein:'조단백(%)',dmCarb:'건물기준 탄수(%)',firstIngrCat:'1번 원료',
   cautionN:'주의 성분(개)',dangerN:'위험 성분(개)'};
 const evLabel=k=>EV_LABEL[k]||RATING_LABEL[k.split('.')[1]]||k;
-const ROLE_LABEL={official:'제조사 공식',importer:'수입사 공식',authority:'정부·기관',retail:'판매처'};
+const ROLE_LABEL={official:'제조사 공식',importer:'수입사 공식',authority:'정부·기관',retail:'판매처',label:'제품 라벨',catalog:'카탈로그'};
 const decision={};  // stagingId -> 'publish' | 'reject'
 let DATA=null;
 
@@ -230,7 +246,15 @@ const FIELD=[
   {k:'facts.cautionN',   label:'주의 성분 (개)',     type:'num',step:'1'},
   {k:'facts.dangerN',    label:'위험 성분 (개)',     type:'num',step:'1'},
   {k:'price.p',          label:'가격 (원)',          type:'num',step:'10'},
-  {k:'price.wg',         label:'중량 (g)',           type:'num',step:'1'}
+  {k:'price.wg',         label:'중량 (g)',           type:'num',step:'1'},
+  /* 가격 기준 용량은 '판매 중인 용량 중 최소' 여야 한다(DATA-POLICY 3.4).
+     확인한 용량을 다 적어야 게이트가 최소값인지 볼 수 있다. */
+  {k:'price.wgOptions',  label:'판매 용량 (g, 쉼표)', type:'text',
+   placeholder:'2000, 6000, 11400'},
+  /* 가격 근거가 될 쿠팡 상품 페이지. 파트너스 단축링크는 근거가 못 된다 —
+     어느 상품인지 주소만 봐서는 알 수 없기 때문이다. */
+  {k:'price.srcUrl',     label:'쿠팡 상품 페이지 (가격 근거)', type:'text', wide:true,
+   placeholder:'https://www.coupang.com/vp/products/…'}
 ];
 
 /* 구매 링크는 숫자가 아니라 따로 다룬다. 쿠팡 파트너스 링크로만 수수료가 붙으므로
@@ -251,18 +275,40 @@ function effective(it){
 function isEdited(it){
   const e=edits[it.stagingId];
   if(!e)return false;
-  return Object.keys(e.facts||{}).length>0||Object.keys(e.price||{}).length>0;
+  return Object.keys(e.facts||{}).length>0||Object.keys(e.price||{}).length>0||!!e.label;
 }
+
+/* ── 라벨을 채운 뒤의 항목 ──
+   발행 직전에 publish.js 가 하는 일과 똑같아야 한다. 그래서 같은 함수를 부른다.
+   여기서 따로 조립하면 화면이 '통과' 라고 해 놓고 발행이 막히거나, 그 반대가 된다. */
+function merged(it){
+  return PUB.applyEdits(it, edits[it.stagingId]);
+}
+
+/* 지금 값으로 게이트를 다시 돌린 결과. build-review 가 미리 계산해 둔 ready 는
+   라벨을 채우기 전 상태라, 채운 뒤에는 여기서 다시 판정해야 한다.
+   같은 checkItem 을 부르므로 검사가 느슨해지지 않는다.
+   (중복 검사는 data.js 가 필요해 여기서는 못 한다 — 발행 직전 publish.js 가 한다.) */
+function gateNow(it){
+  if(!isEdited(it))return {fail:it.gates.g1fail||[],warn:it.gates.g1warn||[],
+                           draft:!!it.draft,pending:!!it.pricePending,ready:!!it.ready};
+  const m=merged(it);
+  const pending=m.proposed.pricePending===true;
+  if(m.proposed.draft)return {fail:[],warn:[],draft:true,pending,ready:false,
+                              todo:GATE1.draftTodo(m)};
+  let r;
+  try{ r=GATE1.checkItem(m,[],new Set()); }
+  catch(err){ return {fail:[{msg:'게이트 검사 중 오류: '+err.message}],warn:[],
+                      draft:false,pending,ready:false}; }
+  return {...r,draft:false,pending,ready:r.fail.length===0};
+}
+/* 지금 화면이 주장하는 별점. 값을 합치고 점수를 매기는 일은 publish.js 가 이미
+   하므로 그 결과를 그대로 읽는다. 여기서 또 계산하면 화면과 발행 결과가 갈린다 —
+   실제로 가격을 넣어도 '가격 대기' 로 남고 가성비 별점이 안 나왔다. */
 function derived(it){
-  const v=effective(it);
-  const pKg=(v.price.p>0&&v.price.wg>0)?Math.round(v.price.p/(v.price.wg/1000)):null;
-  const ratings={
-    quality:ENGINE.rateQuality(v.facts.protein,v.facts.firstIngrCat),
-    carb:ENGINE.rateCarb(v.facts.dmCarb),
-    additive:ENGINE.rateAdditive(v.facts.cautionN,v.facts.dangerN),
-    value:it.pricePending?null:ENGINE.rateValue(pKg)
-  };
-  return {pKg,ratings,score:it.pricePending?null:scoreOf(ratings)};
+  const p=merged(it).proposed;
+  return {pKg:p.price?.pKg??null, ratings:p.ratings, score:p.score??null,
+          pending:p.pricePending===true};
 }
 
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -312,6 +358,50 @@ function sourceBlock(it){
   }).join('') || '<div class="msg f">출처가 없습니다</div>';
 }
 
+/* ── 라벨 붙여넣기 ──
+   칸을 마흔 개 만드는 대신 라벨을 통째로 받는다. 원료 표기·보장성분·열량·
+   썸네일·구매 링크를 한 번에 갈라낸다. 갈라낸 결과를 그대로 보여 주고,
+   사람이 확인한 뒤에야 값에 반영된다 — 조용히 집어넣지 않는다. */
+function labelBox(it){
+  const L=edits[it.stagingId]?.label;
+  const done=!!L;
+  return `<div class="lab${done?' ok':''}">
+    <h3 style="margin-top:0">라벨 붙여넣기</h3>
+    <p class="d">제품 라벨의 <b>원재료명·보장성분·칼로리</b>를 통째로 복사해 넣으세요.
+      썸네일 주소와 쿠팡 구매 링크도 같이 넣으면 함께 읽습니다. 형식은 신경 쓰지 않아도 됩니다.</p>
+    <textarea data-label rows="5" placeholder="원재료명: 신선한 닭고기(21%), 닭고기 분말(20%), …&#10;조단백질(이상): 35 %&#10;조지방(이상): 11 %&#10;…&#10;3070 kcal/kg&#10;https://… (썸네일)&#10;https://link.coupang.com/a/… (구매)"></textarea>
+    <div class="labact">
+      <button data-act="readlabel">라벨 읽기</button>
+      ${done?`<button data-act="droplabel" class="ghost">지우기</button>`:''}
+    </div>
+    <div class="labout">${done?labelSummary(L):''}</div>
+  </div>`;
+}
+
+/* 무엇을 읽었는지 그대로 보여 준다. 못 읽은 건 못 읽었다고 적는다. */
+function labelSummary(L){
+  const g=L.ga||{};
+  const miss=['protein','fat','fiber','moisture'].filter(k=>g[k]==null);
+  const K={protein:'조단백',fat:'조지방',fiber:'조섬유',moisture:'수분',ash:'조회분'};
+  const rows=[
+    ['원료', L.ingredients.length ? `${L.ingredients.length}종 · 1번 ${L.ingredients[0]}` : '못 읽음'],
+    ['보장성분', Object.entries(K).filter(([k])=>g[k]!=null).map(([k,l])=>`${l} ${g[k]}`).join(' · ')||'못 읽음'],
+    ['열량', L.kcalPerKg?`${L.kcalPerKg.toLocaleString('ko-KR')} kcal/kg`:'못 읽음'],
+    ['안전성', L.ingredients.length?`양호 ${L.dist.safe} · 주의 ${L.dist.caution} · 위험 ${L.dist.danger}${L.unknown.length?` · 모름 ${L.unknown.length}`:''}`:'—'],
+    ['썸네일', L.thumb?'읽음':'못 읽음'],
+    ['구매 링크', L.buyUrl?'읽음':'못 읽음']
+  ];
+  return `<table class="labtab"><tbody>${rows.map(([k,v])=>
+      `<tr><td>${k}</td><td>${esc(v)}</td></tr>`).join('')}</tbody></table>
+    ${miss.length?`<div class="msg f" style="margin-top:8px">✗ ${miss.map(k=>K[k]).join('·')}을(를) 못 읽었습니다 —
+       건물기준 탄수를 계산할 수 없어요. 아래 칸에 직접 넣어주세요.</div>`:''}
+    ${L.unknown.length?`<div class="msg w" style="margin-top:8px">⚠ 사전에 없는 원료 ${L.unknown.length}개:
+       ${esc(L.unknown.join(', '))}<br>주의·위험 성분 수에 안 들어갑니다. 오타면 고쳐서 다시 읽어주세요.</div>`:''}
+    ${L.ingredients.length?`<details style="margin-top:8px"><summary class="d">읽은 원료 ${L.ingredients.length}종 보기</summary>
+       <div class="d" style="margin-top:6px;line-height:1.8">${L.ingr.map(x=>
+         `<span class="p ${x.safe==='caution'||x.safe==='danger'?'ch':''}">${esc(x.name)}</span>`).join(' ')}</div></details>`:''}`;
+}
+
 /* 값을 고치는 칸. 원본과 달라지면 노란 테두리와 '원래 N' 표시가 붙는다. */
 function editBlock(it){
   const id=it.stagingId, e=edits[id]||{};
@@ -321,15 +411,21 @@ function editBlock(it){
     const cur=e[grp]?.[key];
     const val=cur!==undefined?cur:orig;
     const changed=cur!==undefined&&cur!==orig;
-    const dis=(grp==='price'&&it.pricePending)?' disabled':'';
+    /* 가격 칸을 잠가 뒀었다. 그래서 '가격 대기' 항목은 심사 화면에서 가격을 넣을
+       방법이 아예 없었다 — 영영 가격 대기로 남는다는 뜻이다. 열어 두고,
+       넣은 값이 규칙에 맞는지는 게이트가 판단하게 한다. */
+    const show=val==null?'':Array.isArray(val)?val.join(', '):val;
     const input=f.type==='sel'
-      ? `<select data-edit="${esc(f.k)}"${dis}>${f.opts.map(([v,l])=>
+      ? `<select data-edit="${esc(f.k)}">${f.opts.map(([v,l])=>
           `<option value="${v}"${v===val?' selected':''}>${l}</option>`).join('')}</select>`
-      : `<input type="number" step="${f.step}" inputmode="decimal" data-edit="${esc(f.k)}"
-           value="${val==null?'':esc(val)}"${dis}>`;
-    return `<div class="f${changed?' ch':''}">
+      : f.type==='text'
+        ? `<input type="text" data-edit="${esc(f.k)}" value="${esc(show)}"
+             placeholder="${esc(f.placeholder||'')}" autocapitalize="off" autocomplete="off" spellcheck="false">`
+        : `<input type="number" step="${f.step}" inputmode="decimal" data-edit="${esc(f.k)}"
+             value="${esc(show)}">`;
+    return `<div class="f${changed?' ch':''}"${f.wide?' style="grid-column:1/-1"':''}>
       <label>${esc(f.label)}</label>${input}
-      <div class="was">${changed?'원래 '+esc(orig??'—'):''}</div>
+      <div class="was">${changed?'원래 '+esc(orig==null?'—':Array.isArray(orig)?orig.join(', '):orig):''}</div>
     </div>`;
   }).join('');
 
@@ -353,7 +449,7 @@ function editBlock(it){
       `<a class="buysrc" href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">링크 만들 상품 페이지 열기 ↗</a>`).join('')}
   </div>`;
 
-  return `<div class="sec"><h3>고치기</h3>
+  return `<div class="sec">${labelBox(it)}<h3>고치기</h3>
     <div class="edit">${fields}</div>
     ${buyBlock}
     ${(() => {
@@ -392,13 +488,16 @@ function editBlock(it){
 
 function card(it){
   const g=it.gates;
+  /* 라벨을 채웠으면 그 값으로 다시 돌린 게이트가 진짜다. 여기서 it.draft 를 그대로
+     읽으면 다 채워 놓고도 '자료 수집 중' 이 그대로 붙어 있다. */
+  const G=gateNow(it);
   const badges=[
     /* 자료 수집 중은 '탈락' 이 아니다. 아직 라벨을 못 본 것뿐이라 다르게 적는다. */
-    it.draft
-      ? `<span class="b wa">자료 수집 중</span>`
-      : it.pricePending
-        ? `<span class="b wa">가격 대기</span>`
-        : `<span class="b ${g.g1==='pass'?'ok':'no'}">게이트1 ${g.g1==='pass'?'통과':'탈락'}</span>`,
+    G.draft
+      ? `<span class="b wa b-g1">자료 수집 중</span>`
+      : G.pending
+        ? `<span class="b wa b-g1">가격 대기</span>`
+        : `<span class="b b-g1 ${G.ready?'ok':'no'}">게이트1 ${G.ready?'통과':'탈락'}</span>`,
     /* 사람이 라벨을 보고 직접 넣은 건은 AI 블라인드 대조를 면제한다. 통과처럼
        보이게 하지 않고 '사람 입력' 이라고 그대로 적는다 — 심사자가 알아야 한다. */
     /* 자료 수집 중이면 대조할 값 자체가 없다. '불일치' 라고 적으면 틀렸다는 뜻이 된다. */
@@ -420,20 +519,24 @@ function card(it){
       </div>
     </div>
     <div class="body">
-      ${it.draft?`<div class="msg w"><b>자료 수집 중</b> — 카탈로그에서 기본 정보만 가져온 상태예요.
-         아래를 채우면 채점이 돌아갑니다.<br>${(g.todo||[]).map(t=>'· '+esc(t)).join('<br>')}</div>`
-        : it.pricePending?`<div class="msg w">⏸ 가격을 아직 못 구했습니다. 쿠팡 상품 URL 과 최소 용량 가격이 들어와야 발행할 수 있습니다</div>`:''}
-      ${g.g1fail.map(f=>`<div class="msg f">✗ ${esc(f.msg)}</div>`).join('')}
-      ${g.g1warn.map(w=>`<div class="msg w">⚠ ${esc(w.msg)}</div>`).join('')}
+      <div class="gatemsg">
+      ${G.draft?`<div class="msg w"><b>자료 수집 중</b> — 카탈로그에서 기본 정보만 가져온 상태예요.
+         아래 <b>라벨 붙여넣기</b>에 라벨을 넣으면 채점이 돌아갑니다.<br>${
+           (G.todo||g.todo||[]).map(t=>'· '+esc(t)).join('<br>')}</div>`
+        : G.pending?`<div class="msg w">⏸ 가격을 아직 못 구했습니다 — 아래 <b>가격·중량·판매 용량·쿠팡 상품 페이지</b>를 채우면 가성비 별점과 총점이 나옵니다</div>`:''}
+      ${G.fail.map(f=>`<div class="msg f">✗ ${esc(f.msg)}</div>`).join('')}
+      ${G.warn.map(w=>`<div class="msg w">⚠ ${esc(w.msg)}</div>`).join('')}
+      </div>
       ${g.g3warn.map(w=>`<div class="msg w">⚠ ${esc(w)}</div>`).join('')}
-      ${it.draft?'':`<div class="sec"><h3>대조</h3>${auditTable(it)}</div>`}
+      ${G.draft?'':`<div class="sec"><h3>대조</h3>${auditTable(it)}</div>`}
       <div class="sec"><h3>출처와 근거</h3>${sourceBlock(it)}</div>
       ${editBlock(it)}
     </div>
     <div class="act">
       <button data-act="reject">반려</button>
-      <button data-act="publish"${it.ready||isEdited(it)?'':' disabled'}>${
-        isEdited(it)?'고쳐서 발행':it.ready?'발행':'게이트 미통과'}</button>
+      <button data-act="publish"${G.ready?'':' disabled'}>${
+        G.ready?(isEdited(it)?'고쳐서 발행':'발행')
+          :G.draft?'자료 수집 중':'게이트 미통과'}</button>
     </div>
   </div>`;
 }
@@ -532,9 +635,32 @@ function patchCard(id){
     pill('총점',d.score,o.score,'score')
   ].join('');
 
+  /* 라벨을 채웠으면 게이트를 그 값으로 다시 돌린 결과가 진짜다.
+     안 그러면 다 채워 놓고도 '게이트 미통과' 로 막혀 발행이 안 된다 — 실제로 그랬다. */
+  const g=gateNow(it);
   const pub=el.querySelector('.act button[data-act="publish"]');
-  pub.disabled=!(it.ready||ed);
-  pub.textContent=ed?'고쳐서 발행':it.ready?'발행':'게이트 미통과';
+  pub.disabled=!g.ready;
+  pub.textContent=g.ready?(ed?'고쳐서 발행':'발행')
+    :g.draft?'자료 수집 중':'게이트 미통과';
+
+  /* 무엇이 막고 있는지 카드 위쪽 줄에 그대로 보여 준다 */
+  const box=el.querySelector('.gatemsg');
+  if(box){
+    box.innerHTML=[
+      g.draft?`<div class="msg w"><b>자료 수집 중</b> — 아래 <b>라벨 붙여넣기</b>에 라벨을 넣으면 채점이 돌아갑니다.<br>${
+        (g.todo||it.gates.todo||[]).map(t=>'· '+esc(t)).join('<br>')}</div>`:'',
+      !g.draft&&g.pending?`<div class="msg w">⏸ 가격을 아직 못 구했습니다 — 아래 <b>가격·중량·판매 용량·쿠팡 상품 페이지</b>를 채우면 가성비 별점과 총점이 나옵니다</div>`:'',
+      ...g.fail.map(f=>`<div class="msg f">✗ ${esc(f.msg)}</div>`),
+      ...g.warn.map(w=>`<div class="msg w">⚠ ${esc(w.msg)}</div>`)
+    ].join('');
+  }
+
+  const b1=el.querySelector('.b-g1');
+  if(b1){
+    b1.className='b b-g1 '+(g.draft||g.pending?'wa':g.ready?'ok':'no');
+    b1.textContent=g.draft?'자료 수집 중':g.pending?'가격 대기':
+      g.ready?'게이트1 통과':'게이트1 탈락';
+  }
 }
 
 /* 값이 원본과 같아지면 수정 기록에서 지운다 — 안 고친 것으로 되돌아간다 */
@@ -543,7 +669,18 @@ function setEdit(id,path,raw){
   const [grp,key]=path.split('.');
   const orig=dig(it.proposed,path);
   let val=raw;
-  const isText = path==='facts.firstIngrCat' || path===BUY_FIELD;
+  const isText = path==='facts.firstIngrCat' || path===BUY_FIELD || path==='price.srcUrl';
+  if(path==='price.wgOptions'){
+    /* '2000, 6000, 11400' → [2000,6000,11400]. 게이트가 최소 용량인지 볼 때 쓴다. */
+    const list=String(raw).split(/[,\s]+/).map(s=>Number(s)).filter(n=>n>0);
+    val=list.length?[...new Set(list)].sort((a,b)=>a-b):null;
+    const e0=edits[id]||(edits[id]={}); const g0=e0.price||(e0.price={});
+    if(val==null)delete g0.wgOptions; else g0.wgOptions=val;
+    if(!Object.keys(g0).length)delete e0.price;
+    if(!Object.keys(e0).length&&!e0.reason)delete edits[id];
+    saveEdits();patchCard(id);updateBar();
+    return;
+  }
   if(!isText){
     val=String(raw).trim()===''?null:Number(raw);
     if(val!=null&&Number.isNaN(val))return;
@@ -574,7 +711,50 @@ document.addEventListener('change',e=>{
   }
 });
 
+/* ── 라벨 읽기 ──
+   갈라낸 값을 edits 에 넣는다. 사람이 이미 손으로 고쳐 둔 칸은 덮지 않는다 —
+   라벨보다 사람이 직접 넣은 값이 우선이다. */
+function readLabel(card){
+  const id=card.dataset.id, it=itemById(id);
+  const text=card.querySelector('[data-label]').value;
+  if(!text.trim()){toast('라벨 내용을 붙여넣어 주세요');return;}
+
+  const r=LABEL.parse(text);
+  if(!r.ingredients.length&&r.ga.protein==null){
+    toast('원료 표기도 보장성분도 못 찾았어요 — 라벨 내용이 맞는지 봐주세요');return;
+  }
+  const e=edits[id]||(edits[id]={});
+  e.label={
+    ingredients:r.ingredients, ga:r.ga, kcalPerKg:r.kcalPerKg,
+    ingr:r.ingr, dist:r.dist, unknown:r.unknown,
+    thumb:r.thumb, buyUrl:r.buyUrl,
+    /* 근거 출처로 쓸 주소. 라벨을 판독한 화면(상품 페이지)을 가리킨다. */
+    srcUrl:r.productUrl||it.sources?.[0]?.url||'',
+    at:new Date().toISOString(), text
+  };
+  const f=e.facts||(e.facts={});
+  for(const [k,v] of Object.entries(r.facts)){
+    if(v==null)continue;
+    if(f[k]!==undefined)continue;                 /* 사람이 이미 고친 칸은 둔다 */
+    if(v!==dig(it.proposed,'facts.'+k))f[k]=v;
+  }
+  if(r.buyUrl){ const p=e.price||(e.price={}); if(p.buyUrl===undefined)p.buyUrl=r.buyUrl; }
+  saveEdits();
+  render();
+  toast(`읽었습니다 — 원료 ${r.ingredients.length}종${r.unknown.length?` (모르는 원료 ${r.unknown.length}개)`:''}`);
+}
+
 document.addEventListener('click',e=>{
+  const rl=e.target.closest('[data-act="readlabel"]');
+  if(rl){readLabel(rl.closest('.card'));return;}
+  const dl=e.target.closest('[data-act="droplabel"]');
+  if(dl){
+    const id=dl.closest('.card').dataset.id;
+    if(edits[id]){delete edits[id].label; if(!Object.keys(edits[id]).length)delete edits[id];}
+    saveEdits();render();toast('라벨 판독을 지웠습니다');
+    return;
+  }
+
   const calc=e.target.closest('[data-act="calc"]');
   if(calc){
     const card=calc.closest('.card');
