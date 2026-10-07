@@ -302,6 +302,10 @@ select.inp{cursor:pointer;appearance:none;
 .nf-out{margin-top:14px;padding:12px 14px;border-radius:8px;background:var(--panel2);
   border:1px solid var(--line);font-size:12px;line-height:1.8;color:var(--ink2)}
 .nf-out b{color:var(--ink)}
+/* 사용 분석 — 두 칸 표, 좁으면 한 칸. KPI 는 폰에서도 두 개씩 */
+.grid2.an2{grid-template-columns:1fr 1fr}
+@media (max-width:760px){.grid2.an2{grid-template-columns:1fr}.kpis.an-kpis{grid-template-columns:1fr 1fr}
+  .an-kpis .kpi-v{font-size:24px}}
 @media (max-width:640px){.nf-g2,.nf-g4,.nf-g5{grid-template-columns:1fr 1fr}}
 </style>
 </head>
@@ -349,6 +353,7 @@ document.write(['engine/dict.js', 'engine/phrases.js', 'engine/engine.js', 'data
 <script src="github.js"></script>
 <script src="newfood.js"></script>
 <script src="store.js"></script>
+<script src="analytics.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

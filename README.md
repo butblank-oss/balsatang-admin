@@ -11,6 +11,7 @@ GitHub API 로 직접 커밋한다. 커밋하면 몇 분 뒤 https://balsatang.c
 |---|---|
 | `index.html` | 셸. 성분 사전 · 콘텐츠 · 태그 · 리콜. 사료·심사는 아래 화면을 그 자리에 띄운다 |
 | `foods.html` | 사료 편집 — 기본 정보 · 썸네일 · 가격 · 구매 링크 · **보장성분표 · 원료 · 판정 카드 · 맞춤 태그** |
+| `analytics.js` | 사용 분석 — 프론트가 Supabase 에 쌓은 익명 기록을 읽는다. 설치는 [`analytics/README.md`](analytics/README.md) |
 | `review.html` | 발행 심사 — 수집된 사료를 검토하고 승인하면 그 자리에서 발행한다 |
 
 ## 왜 도메인이 갈렸나

@@ -43,6 +43,7 @@ function markDirty(){ el('dirtyDot').innerHTML = store.dirty ? '<span class="dir
 const NAV = [
   {h:'메인'},
   {k:'dash',   label:'대시보드',    ico:'chart'},
+  {k:'stats',  label:'사용 분석',    ico:'trophy'},
   {h:'콘텐츠 관리'},
   /* 사료·가격·심사는 어드민 안에서 진짜 편집기를 띄운다.
      예전에 이 화면이 갖고 있던 사료 편집기는 지금 데이터 형태를 몰라서
@@ -80,7 +81,7 @@ function pgEmbed(k){
       style="width:100%;height:calc(100vh - 132px);min-height:600px;border:1px solid var(--line);
              border-radius:12px;background:var(--bg);display:block"></iframe>`;
 }
-const TITLES = {dash:'대시보드', foods:'사료 관리', ingr:'성분 관리', tags:'맞춤찾기 태그 관리',
+const TITLES = {dash:'대시보드', stats:'사용 분석', foods:'사료 관리', ingr:'성분 관리', tags:'맞춤찾기 태그 관리',
   recall:'리콜 관리', price:'가격 관리', article:'콘텐츠 관리', reviews:'리뷰 관리',
   review:'발행 심사', wizard:'사료 등록'};
 
@@ -184,7 +185,7 @@ function go(k, arg){
      아래 핸들러가 다를 때만 go 를 부르므로 되돌이는 생기지 않는다. */
   if (location.hash !== hashFor(k)) location.hash = hashFor(k);
   if(EMBED[k]){ pgEmbed(k); el('wrap').scrollTop = 0; return; }
-  ({dash:pgDash, ingr:pgIngr, tags:pgTags, recall:pgRecall,
+  ({dash:pgDash, stats:()=>ANALYTICS.page(), ingr:pgIngr, tags:pgTags, recall:pgRecall,
     article:pgArticle, reviews:pgReview}[k] || pgDash)(arg);
   el('wrap').scrollTop = 0;
 }
