@@ -85,6 +85,10 @@ const PUB = {
     }
 
     Object.assign(p.facts ??= {}, edit.facts || {});
+    /* 화면의 '주의성분 N종' 은 warnN 이다. 라벨로 원료가 바뀌면 주의·위험 수도 바뀌는데
+       warnN 을 그대로 두면 게이트가 'warnN 이 사실값과 다릅니다' 로 막는다.
+       사람이 쓰는 칸이 아니라 facts 에서 나오는 값이라 여기서 다시 맞춘다. */
+    if (p.facts.cautionN != null) p.warnN = p.facts.cautionN + (p.facts.dangerN ?? 0);
     if (L) evidence['facts.dmCarb'] = { src: sources.length - 1,
       quote: `조단백 ${L.ga.protein} / 조지방 ${L.ga.fat} / 조섬유 ${L.ga.fiber} / 수분 ${L.ga.moisture} → 건물기준 탄수 ${p.facts.dmCarb}%` };
 
