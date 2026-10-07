@@ -8,13 +8,13 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <style>
 :root{
-  --bg:#0D0F14; --panel:#151922; --panel2:#1B202B; --line:#252B38; --line2:#333B4D;
+  --bg:#F4F6F9; --panel:#FFFFFF; --panel2:#EEF1F5; --line:#DDE2EA; --line2:#C9D0DB;
   /* 어두운 배경에서 읽히는 최소선. muted #5A6376 은 2.7~3.2:1,
      sub #7C8698 은 4.5:1 언저리라 작은 글자가 안 읽혔다. 한 단계씩 밝혔다. */
-  --ink:#E8EBF0; --ink2:#B4BCCB; --sub:#949FB3; --muted:#838DA3;
-  --pri:#2F6FED; --pri-ink:#7FA9FF; --pri-d:#245BC9; --pri-soft:#16233D;
-  --good:#22C55E; --good-soft:#0F2A1A; --warn:#F59E0B; --warn-soft:#2A2010;
-  --bad:#EF4444; --bad-soft:#2A1315;
+  --ink:#161A22; --ink2:#39404D; --sub:#545D6E; --muted:#667085;
+  --pri:#2F6FED; --pri-ink:#1F57C8; --pri-d:#1F4FB5; --pri-soft:#E6EEFD;
+  --good:#15803D; --good-soft:#E6F5EB; --warn:#B45309; --warn-soft:#FDF3E1;
+  --bad:#C62828; --bad-soft:#FDECEC;
   --r:8px; --r-lg:12px;
   --t:.16s cubic-bezier(.4,0,.2,1);
 }
@@ -41,7 +41,7 @@ svg.i{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke
   background:none;border-radius:var(--r);color:var(--ink2);font-size:12.5px;font-weight:600;
   cursor:pointer;text-align:left;transition:all var(--t);margin-bottom:1px}
 .nav-i:hover{background:var(--panel2);color:var(--ink)}
-.nav-i.on{background:var(--pri-soft);color:#7FA9FF}
+.nav-i.on{background:var(--pri-soft);color:#1F57C8}
 .nav-i .i{color:inherit;opacity:.85}
 .nav-i .dot{margin-left:auto;min-width:16px;height:16px;padding:0 5px;border-radius:8px;
   background:var(--bad);color:#fff;font-size:9.5px;font-weight:800;display:flex;
@@ -71,9 +71,9 @@ svg.i{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke
    세로로 떨어지고 iframe 안이 읽히지 않았다. 좁으면 사이드바를 서랍으로 뺀다. */
 @media (max-width:760px){
   #side{position:fixed;left:0;top:0;z-index:60;transform:translateX(-100%);
-    transition:transform .22s cubic-bezier(.4,0,.2,1);box-shadow:0 0 40px rgba(0,0,0,.6)}
+    transition:transform .22s cubic-bezier(.4,0,.2,1);box-shadow:0 0 40px rgba(15,23,42,.18)}
   #side.open{transform:none}
-  #sideDim{position:fixed;inset:0;z-index:55;background:rgba(0,0,0,.55);display:none}
+  #sideDim{position:fixed;inset:0;z-index:55;background:rgba(15,23,42,.35);display:none}
   #sideDim.on{display:block}
   .topbar .burger{display:inline-flex}
   .topbar .sm-hide{display:none}
@@ -93,8 +93,8 @@ svg.i{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke
 .btn:hover{background:var(--line);border-color:var(--sub)}
 .btn.pri{background:var(--pri);border-color:var(--pri);color:#fff}
 .btn.pri:hover{background:var(--pri-d);border-color:var(--pri-d)}
-.btn.dan{background:var(--bad-soft);border-color:#5A2126;color:#FF8088}
-.btn.dan:hover{background:#3A1A1E}
+.btn.dan{background:var(--bad-soft);border-color:#F3C1C1;color:#B91C1C}
+.btn.dan:hover{background:#F3C1C1}
 .btn.sm{padding:5px 10px;font-size:11px;border-radius:6px}
 .btn:disabled{opacity:.45;cursor:default}
 .btn.ghost{background:none;border-color:transparent;color:var(--sub)}
@@ -104,8 +104,8 @@ svg.i{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:18px}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:18px}
 .kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px 18px}
-.kpi.alert{border-color:#5A2126;background:linear-gradient(180deg,#1C1417,var(--panel))}
-.kpi.ok{border-color:#1D4430;background:linear-gradient(180deg,#101C15,var(--panel))}
+.kpi.alert{border-color:#F3C1C1;background:linear-gradient(180deg,#FDF0F0,var(--panel))}
+.kpi.ok{border-color:#B7E1C4;background:linear-gradient(180deg,#EEF8F1,var(--panel))}
 .kpi-l{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:var(--ink2);margin-bottom:9px}
 .kpi-v{font-size:29px;font-weight:900;letter-spacing:-1.2px;line-height:1}
 .kpi-s{margin-top:7px;font-size:10.5px;color:var(--muted)}
@@ -124,8 +124,8 @@ tbody tr:hover{background:var(--panel2)}
   font-size:10px;font-weight:800;white-space:nowrap}
 .tag.good{background:var(--good-soft);color:var(--good)}
 .tag.warn{background:var(--warn-soft);color:var(--warn)}
-.tag.bad{background:var(--bad-soft);color:#FF8088}
-.tag.info{background:var(--pri-soft);color:#7FA9FF}
+.tag.bad{background:var(--bad-soft);color:#B91C1C}
+.tag.info{background:var(--pri-soft);color:#1F57C8}
 .tag.mute{background:var(--panel2);color:var(--sub)}
 .todo{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line);font-size:12.5px}
 .todo:last-child{border-bottom:none}
@@ -174,13 +174,13 @@ select.inp{cursor:pointer;appearance:none;
 .chip{padding:6px 12px;border:1px solid var(--line2);border-radius:99px;background:var(--panel2);
   font-size:11.5px;font-weight:700;color:var(--ink2);cursor:pointer;transition:all var(--t)}
 .chip:hover{border-color:var(--sub)}
-.chip.on{background:var(--pri-soft);border-color:var(--pri);color:#7FA9FF}
+.chip.on{background:var(--pri-soft);border-color:var(--pri);color:#1F57C8}
 .seg{display:inline-flex;gap:5px}
 .seg button{padding:6px 11px;border:1px solid var(--line2);border-radius:6px;background:var(--panel2);
   font-size:11px;font-weight:800;color:var(--sub);cursor:pointer;transition:all var(--t)}
-.seg button.on[data-v="safe"]{background:var(--good-soft);border-color:#1D4430;color:var(--good)}
-.seg button.on[data-v="caution"]{background:var(--warn-soft);border-color:#4A3A12;color:var(--warn)}
-.seg button.on[data-v="danger"]{background:var(--bad-soft);border-color:#5A2126;color:#FF8088}
+.seg button.on[data-v="safe"]{background:var(--good-soft);border-color:#B7E1C4;color:var(--good)}
+.seg button.on[data-v="caution"]{background:var(--warn-soft);border-color:#F2D49B;color:var(--warn)}
+.seg button.on[data-v="danger"]{background:var(--bad-soft);border-color:#F3C1C1;color:#B91C1C}
 
 /* ── WIZARD ── */
 .steps{display:flex;align-items:center;gap:0;background:var(--panel);border:1px solid var(--line);
@@ -189,9 +189,9 @@ select.inp{cursor:pointer;appearance:none;
 .step-n{width:22px;height:22px;border-radius:50%;background:var(--panel2);border:1px solid var(--line2);
   display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:800;flex-shrink:0}
 .step.on{color:var(--ink)} .step.on .step-n{background:var(--pri);border-color:var(--pri);color:#fff}
-.step.done{color:var(--good)} .step.done .step-n{background:var(--good-soft);border-color:#1D4430;color:var(--good)}
+.step.done{color:var(--good)} .step.done .step-n{background:var(--good-soft);border-color:#B7E1C4;color:var(--good)}
 .step-line{flex:1;height:1px;background:var(--line);margin:0 10px}
-.step.done + .step-line{background:#1D4430}
+.step.done + .step-line{background:#B7E1C4}
 .tabs{display:flex;gap:2px;background:var(--panel);border:1px solid var(--line);
   border-radius:var(--r-lg);padding:5px;margin-bottom:14px}
 .tabs button{flex:1;padding:9px;border:none;border-radius:7px;background:none;font-size:11.5px;
@@ -226,24 +226,24 @@ select.inp{cursor:pointer;appearance:none;
 .iarrows button:hover{background:var(--line);color:var(--ink)}
 .ix{width:22px;height:22px;border:none;background:none;color:var(--muted);cursor:pointer;
   border-radius:5px;display:flex;align-items:center;justify-content:center}
-.ix:hover{background:var(--bad-soft);color:#FF8088}
+.ix:hover{background:var(--bad-soft);color:#B91C1C}
 
 /* ── VERDICT CARDS ── */
 .vcard{border:1px solid;border-radius:var(--r-lg);padding:12px;margin-bottom:9px}
-.vcard.pos{border-color:#1D4430;background:#0E1A12}
-.vcard.cau{border-color:#4A3A12;background:#1A1509}
-.vcard.bad{border-color:#5A2126;background:#1A0E10}
+.vcard.pos{border-color:#B7E1C4;background:#EEF8F1}
+.vcard.cau{border-color:#F2D49B;background:#FDF6E7}
+.vcard.bad{border-color:#F3C1C1;background:#FDF0F0}
 .vcard-h{display:flex;align-items:center;gap:7px;margin-bottom:9px}
 .vcard-h select{width:auto;padding:3px 24px 3px 8px;font-size:10.5px;font-weight:800;
   background-color:transparent;border-color:transparent}
 .vcard.pos .vcard-h select{color:var(--good)}
 .vcard.cau .vcard-h select{color:var(--warn)}
-.vcard.bad .vcard-h select{color:#FF8088}
+.vcard.bad .vcard-h select{color:#B91C1C}
 .vcard-h .sp{flex:1}
 .vcard .inp{margin-bottom:6px;background:#0000004d}
 .vcard .inp:last-child{margin-bottom:0}
 .guide{margin-top:12px;padding:12px 14px;background:var(--pri-soft);border-radius:var(--r);
-  font-size:11px;line-height:1.7;color:#9DBEFF}
+  font-size:11px;line-height:1.7;color:#1F57C8}
 .guide b{display:block;margin-bottom:5px;font-size:11px}
 
 /* ── SCORE ── */
@@ -252,7 +252,7 @@ select.inp{cursor:pointer;appearance:none;
 .scorebox .v{font-size:44px;font-weight:900;letter-spacing:-2px;line-height:1;color:var(--good)}
 .stars{display:flex;gap:3px;align-items:center}
 .stars button{width:22px;height:22px;border:none;background:none;cursor:pointer;color:var(--line2);padding:0}
-.stars button.on{color:#FFB800}
+.stars button.on{color:#D97706}
 .stars .i{fill:currentColor;stroke:none}
 .stars .lbl{margin-left:7px;font-size:11px;font-weight:700;color:var(--ink2)}
 
@@ -269,9 +269,9 @@ select.inp{cursor:pointer;appearance:none;
 /* 제목의 b 는 flex 인데, 본문 문장 안의 b 까지 블록으로 떨어져 나갔다. 안에서는 그냥 굵게. */
 .modal-h p b{display:inline;font-size:inherit;font-weight:700;color:var(--ink2)}
 .modal-f{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
-.warnbox{margin-top:14px;padding:12px 14px;background:var(--bad-soft);border:1px solid #5A2126;
-  border-radius:var(--r);font-size:11px;line-height:1.8;color:#FF9AA1}
-.condbox{margin-top:12px;padding:13px;border:1px solid #4A3A12;border-radius:var(--r);background:#17130A}
+.warnbox{margin-top:14px;padding:12px 14px;background:var(--bad-soft);border:1px solid #F3C1C1;
+  border-radius:var(--r);font-size:11px;line-height:1.8;color:#B91C1C}
+.condbox{margin-top:12px;padding:13px;border:1px solid #F2D49B;border-radius:var(--r);background:#FDF6E7}
 
 /* ── PAGER / TOAST ── */
 .pager{display:flex;justify-content:center;align-items:center;gap:4px;margin-top:16px}

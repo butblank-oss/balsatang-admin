@@ -7,9 +7,9 @@
 <link rel="icon" href="./favicon.svg">
 <title>발사탕 · 발행 심사</title>
 <style>
-:root{--bg:#0D0F14;--panel:#151922;--panel2:#1B2029;--line:#252B38;--ink:#E8EBF0;--sub:#949FB3;--muted:#838DA3;
---pri:#2F6FED;--pri-d:#245BC9;--pri-soft:#16233D;--good:#22C55E;--good-soft:#0F2A1A;
---warn:#F59E0B;--warn-soft:#2A2010;--bad:#EF4444;--bad-soft:#2A1315;--r:8px;--r-lg:12px;--t:.16s cubic-bezier(.4,0,.2,1)}
+:root{--bg:#F4F6F9;--panel:#FFFFFF;--panel2:#EEF1F5;--line:#DDE2EA;--ink:#161A22;--sub:#545D6E;--muted:#667085;
+--pri:#2F6FED;--pri-d:#1F4FB5;--pri-soft:#E6EEFD;--good:#15803D;--good-soft:#E6F5EB;
+--warn:#B45309;--warn-soft:#FDF3E1;--bad:#C62828;--bad-soft:#FDECEC;--r:8px;--r-lg:12px;--t:.16s cubic-bezier(.4,0,.2,1)}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--ink);font-family:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;
   font-size:14px;line-height:1.5;padding-bottom:120px;-webkit-font-smoothing:antialiased}
@@ -18,9 +18,18 @@ a:hover{text-decoration:underline}
 /* 브라우저 기본 스타일이 입력칸 글자를 검게 칠한다. 어두운 배경이라 안 보였다 —
    라벨 붙여넣기 칸이 통째로 까만 글씨였다. 물려받게 해 둔다. */
 button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit;letter-spacing:inherit}
+/* 대표 책임 승인 칸 */
+.ovr{margin:10px 0;padding:12px 14px;border:1px solid var(--warn);border-radius:var(--r);background:var(--warn-soft)}
+.ovr.on{border-color:var(--good);background:var(--good-soft)}
+.ovr h3{font-size:13px;margin-bottom:4px}
+.ovrchk{display:flex;gap:8px;align-items:flex-start;margin:6px 0;font-size:13px;cursor:pointer}
+.ovrchk input{margin-top:3px}
+.ovr [data-ovr-reason]{width:100%;margin:8px 0;padding:9px 10px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
+.ovr button{padding:8px 14px;border-radius:var(--r);border:none;background:var(--pri);color:#fff;font-weight:600;cursor:pointer}
+.ovr button.ghost{background:none;border:1px solid var(--line);color:var(--sub)}
 code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
 
-.top{position:sticky;top:0;z-index:20;background:rgba(13,15,20,.92);backdrop-filter:blur(8px);
+.top{position:sticky;top:0;z-index:20;background:rgba(244,246,249,.92);backdrop-filter:blur(8px);
   border-bottom:1px solid var(--line);padding:14px 16px;padding-top:calc(14px + env(safe-area-inset-top))}
 .top h1{font-size:16px;font-weight:700;letter-spacing:-.02em}
 .top .meta{color:var(--sub);font-size:12px;margin-top:3px}
@@ -65,15 +74,15 @@ tr.diff td:first-child{color:var(--bad);font-weight:600}
 
 .srcbox{background:var(--panel2);border:1px solid var(--line);border-radius:var(--r);padding:10px;margin-bottom:8px}
 .srcbox .role{font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px;background:var(--pri-soft);color:var(--pri-ink);border:1px solid var(--pri)}
-.srcbox .role.b{background:#2A2010;color:var(--warn);border-color:var(--warn)}
+.srcbox .role.b{background:#FDF3E1;color:var(--warn);border-color:var(--warn)}
 .srcbox .u{display:block;margin-top:6px;font-size:12px;word-break:break-all}
 .srcbox .d{color:var(--muted);font-size:11px;margin-top:4px}
 .quote{border-left:2px solid var(--line);padding-left:9px;margin-top:6px;color:var(--sub);font-size:12px}
 .quote b{color:var(--ink);font-weight:600;display:block;font-size:11px;margin-bottom:2px}
 
 .msg{font-size:12px;padding:7px 10px;border-radius:var(--r);margin-bottom:5px;border:1px solid}
-.msg.f{background:var(--bad-soft);border-color:#4a2226;color:#FCA5A5}
-.msg.w{background:var(--warn-soft);border-color:#4a3a16;color:#FCD34D}
+.msg.f{background:var(--bad-soft);border-color:#F3C1C1;color:#B91C1C}
+.msg.w{background:var(--warn-soft);border-color:#F2D49B;color:#92400E}
 
 .act{display:flex;gap:8px;padding:12px 14px;border-top:1px solid var(--line);background:var(--panel2)}
 .act button{flex:1;padding:10px;border-radius:var(--r);border:1px solid var(--line);background:transparent;
@@ -83,7 +92,7 @@ tr.diff td:first-child{color:var(--bad);font-weight:600}
 .act button.sel-pub{background:var(--good-soft);border-color:var(--good);color:var(--good)}
 .act button.sel-rej{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
 
-.bar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:rgba(21,25,34,.96);backdrop-filter:blur(10px);
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:rgba(255,255,255,.96);backdrop-filter:blur(10px);
   border-top:1px solid var(--line);padding:12px 16px;padding-bottom:calc(12px + env(safe-area-inset-bottom))}
 .bar .in{max-width:860px;margin:0 auto;display:flex;gap:10px;align-items:center}
 .bar .c{flex:1;font-size:12px;color:var(--sub)}
@@ -95,8 +104,8 @@ tr.diff td:first-child{color:var(--bad);font-weight:600}
 
 .empty{text-align:center;padding:56px 20px;color:var(--muted)}
 .empty b{display:block;color:var(--sub);font-size:15px;margin-bottom:6px}
-.note{background:var(--pri-soft);border:1px solid #23386b;border-radius:var(--r);padding:11px 13px;
-  font-size:12px;color:#9DBBF5;margin-bottom:16px;line-height:1.6}
+.note{background:var(--pri-soft);border:1px solid #E6EEFD;border-radius:var(--r);padding:11px 13px;
+  font-size:12px;color:#1F57C8;margin-bottom:16px;line-height:1.6}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:96px;z-index:40;background:var(--ink);color:var(--bg);
   padding:10px 18px;border-radius:99px;font-size:13px;font-weight:600;opacity:0;transition:opacity var(--t);pointer-events:none}
 .toast.on{opacity:1}
@@ -149,7 +158,7 @@ tr.diff td:first-child{color:var(--bad);font-weight:600}
 .derived .p{font-size:11px;font-weight:600;padding:3px 9px;border-radius:99px;
   background:var(--panel2);border:1px solid var(--line);color:var(--sub);font-variant-numeric:tabular-nums}
 .derived .p.ch{border-color:var(--warn);color:var(--warn);background:var(--warn-soft)}
-.derived .p.score{background:var(--pri-soft);border-color:var(--pri);color:#9DBBF5}
+.derived .p.score{background:var(--pri-soft);border-color:var(--pri);color:#1F57C8}
 .buy{margin-top:10px;padding:10px;border:1px solid var(--warn);background:var(--warn-soft);border-radius:var(--r)}
 .buy.ok{border-color:var(--good);background:var(--good-soft)}
 .buy.bad{border-color:var(--bad);background:var(--bad-soft)}
@@ -172,7 +181,7 @@ tr.diff td:first-child{color:var(--bad);font-weight:600}
 .top .alt{height:30px;padding:0 12px;border-radius:8px;font-size:12.5px;font-weight:600;
   background:transparent;border:1px solid var(--line);color:var(--sub);cursor:pointer}
 .top .alt:hover{background:var(--panel2);color:var(--ink)}
-.bar .in .go{background:var(--good);color:#06210f;font-weight:700}
+.bar .in .go{background:var(--good);color:#FFFFFF;font-weight:700}
 .bar .in .go:hover:not(:disabled){filter:brightness(1.08)}
 .bar .in .go:disabled{opacity:.4;cursor:not-allowed}
 
@@ -276,6 +285,12 @@ const FIELD=[
   /* 썸네일. 다나와 사진이 엉뚱한 제품일 때가 있어 직접 넣을 수 있어야 한다. */
   {k:'meta.thumb',       label:'썸네일 이미지 주소',  type:'text', wide:true,
    placeholder:'https://… .jpg'},
+  /* 성분 정보가 국내 표시사항인지, 해외 본사(글로벌) 정보인지. 해외면 프론트 상세에
+     '※ ○○ 글로벌에서 제시되는 기본 정보로서…' 안내가 붙는다(DATA-POLICY 3.5). */
+  {k:'meta.specOrigin',  label:'성분 정보 기준',     type:'sel',
+   opts:[['domestic','국내 표시사항'],['overseas','해외 본사(글로벌) 정보']]},
+  {k:'meta.specNote',    label:'해외 정보 안내문 (비우면 기본 문구)', type:'text', wide:true,
+   placeholder:'※ ○○ 글로벌에서 제시되는 기본 정보로서, 국내 사료관리법에 따른 제품 표시사항과 일부 다를 수 있습니다.'},
   /* ── 쿠팡 주소는 두 개다. 쓰임이 달라서 한 칸에 넣으면 안 된다 ──
      가격 근거 : www.coupang.com/vp/products/1234…  상품 페이지. 어느 상품의
        얼마인지 확인할 수 있어야 근거가 된다. 게이트가 이 형식을 검사한다.
@@ -307,7 +322,7 @@ function isEdited(it){
   const e=edits[it.stagingId];
   if(!e)return false;
   return Object.keys(e.facts||{}).length>0||Object.keys(e.price||{}).length>0
-       ||Object.keys(e.meta||{}).length>0||!!e.label;
+       ||Object.keys(e.meta||{}).length>0||!!e.label||!!e.override;
 }
 
 /* ── 라벨을 채운 뒤의 항목 ──
@@ -322,8 +337,11 @@ function merged(it){
    같은 checkItem 을 부르므로 검사가 느슨해지지 않는다.
    (중복 검사는 data.js 가 필요해 여기서는 못 한다 — 발행 직전 publish.js 가 한다.) */
 function gateNow(it){
-  if(!isEdited(it))return {fail:it.gates.g1fail||[],warn:it.gates.g1warn||[],
-                           draft:!!it.draft,pending:!!it.pricePending,ready:!!it.ready};
+  if(!isEdited(it)){
+    const fail=it.gates.g1fail||[];
+    return {fail,warn:it.gates.g1warn||[],draft:!!it.draft,pending:!!it.pricePending,ready:!!it.ready,
+            hard:fail.filter(f=>PUB.HARD.has(f.code)),soft:fail.filter(f=>!PUB.HARD.has(f.code))};
+  }
   const m=merged(it);
   const pending=m.proposed.pricePending===true;
   if(m.proposed.draft)return {fail:[],warn:[],draft:true,pending,ready:false,
@@ -339,7 +357,13 @@ function gateNow(it){
   const warn=[...r.warn];
   if(fc)warn.unshift({msg:`제품명은 '${fc.missing.join('·')}' 인데 라벨 앞 원료엔 없습니다 `+
     `(${fc.head.slice(0,3).join(', ')}). 다른 맛의 라벨을 붙여넣었는지, 제품명을 고쳐야 하는지 봐주세요`});
-  return {...r,warn,draft:false,pending,ready:r.fail.length===0};
+  /* 대표 책임 승인 — 승인으로 넘긴 탈락을 빼고 남은 게 없으면 발행할 수 있다.
+     승인으로 못 넘기는 탈락(hard)은 값을 채워야 풀린다. publish.js 와 같은 규칙. */
+  const left=PUB.afterOverride(r.fail,edits[it.stagingId]?.override);
+  const hard=r.fail.filter(f=>PUB.HARD.has(f.code));
+  const soft=r.fail.filter(f=>!PUB.HARD.has(f.code));
+  return {...r,warn,draft:false,pending,ready:left.length===0,
+          overridden:r.fail.length>0&&left.length===0,hard,soft};
 }
 /* 지금 화면이 주장하는 별점. 값을 합치고 점수를 매기는 일은 publish.js 가 이미
    하므로 그 결과를 그대로 읽는다. 여기서 또 계산하면 화면과 발행 결과가 갈린다 —
@@ -483,7 +507,7 @@ function urlHint(it){
   if(buy&&!buyOk)rows.push(['f','구매 버튼 링크가 쿠팡 도메인이 아닙니다.']);
   else if(!buy)rows.push(['w','구매 버튼 링크가 없습니다 — 이 링크로 들어온 구매에만 수수료가 붙습니다.']);
   const thumb=m.thumb;
-  return `${rows.map(([k,t])=>`<div class="msg ${k==='ok'?'':k}"${k==='ok'?' style="border-color:#1e4a2a;background:var(--good-soft);color:#86EFAC"':''}>${t}</div>`).join('')}
+  return `${rows.map(([k,t])=>`<div class="msg ${k==='ok'?'':k}"${k==='ok'?' style="border-color:#B7E1C4;background:var(--good-soft);color:#166534"':''}>${t}</div>`).join('')}
     ${thumb?`<div class="thumbprev"><img src="${esc(thumb)}" alt=""
         onerror="this.closest('.thumbprev').innerHTML='<span class=d>썸네일 주소를 열지 못했습니다 — 주소를 확인해 주세요</span>'">
       <span class="d">썸네일 미리보기</span></div>`:''}`;
@@ -562,6 +586,30 @@ function editBlock(it){
   </div>`;
 }
 
+function pubLabel(G,ed){
+  if(G.ready)return G.overridden?'책임 승인으로 발행':(ed?'고쳐서 발행':'발행');
+  return G.draft?'자료 수집 중':'게이트 미통과';
+}
+
+/* ── 대표 책임 승인 ──
+   게이트가 막은 이유를 하나씩 확인(체크)하고 이유를 적으면 발행할 수 있게 한다.
+   무엇을 넘겼는지와 이유는 발행 데이터(src.override)에 남는다. */
+function overrideBox(it,G){
+  if(G.draft||!G.fail?.length)return '';
+  const ov=edits[it.stagingId]?.override;
+  if(G.hard?.length)return `<div class="ovr"><h3>승인으로 넘길 수 없는 항목</h3>
+    <p class="d">값이 비어 있거나 형식이 깨져 화면에 그릴 수 없어요. 아래 <b>고치기</b>에서 채우면 풀립니다.</p>
+    ${G.hard.map(f=>`<div class="d">· ${esc(f.msg)}</div>`).join('')}</div>`;
+  if(G.overridden)return `<div class="ovr on"><h3>✓ 대표 책임 승인됨</h3>
+    <p class="d">이유: ${esc(ov.reason)}</p>
+    <button data-ovr-cancel class="ghost">승인 취소</button></div>`;
+  return `<div class="ovr"><h3>대표 확인 후 승인</h3>
+    <p class="d">게이트가 막은 이유를 하나씩 직접 확인하고 체크하세요. 모두 체크하고 이유를 적으면 발행할 수 있어요.</p>
+    ${G.soft.map((f,i)=>`<label class="ovrchk"><input type="checkbox" data-ovr-i="${i}"> <span>${esc(f.msg)}</span></label>`).join('')}
+    <input data-ovr-reason placeholder="승인 이유 — 예) 국내 판매 제품 봉투로 직접 확인함" autocomplete="off">
+    <button data-ovr-ok>확인하고 승인</button></div>`;
+}
+
 function card(it){
   const g=it.gates;
   /* 라벨을 채웠으면 그 값으로 다시 돌린 게이트가 진짜다. 여기서 it.draft 를 그대로
@@ -604,6 +652,7 @@ function card(it){
       ${G.fail.map(f=>`<div class="msg f">✗ ${esc(f.msg)}</div>`).join('')}
       ${G.warn.map(w=>`<div class="msg w">⚠ ${esc(w.msg)}</div>`).join('')}
       </div>
+      <div class="ovrbox">${overrideBox(it,G)}</div>
       ${g.g3warn.map(w=>`<div class="msg w">⚠ ${esc(w)}</div>`).join('')}
       ${G.draft?'':`<div class="sec"><h3>대조</h3>${auditTable(it)}</div>`}
       <div class="sec"><h3>출처와 근거</h3>${sourceBlock(it)}</div>
@@ -611,9 +660,7 @@ function card(it){
     </div>
     <div class="act">
       <button data-act="reject">반려</button>
-      <button data-act="publish"${G.ready?'':' disabled'}>${
-        G.ready?(isEdited(it)?'고쳐서 발행':'발행')
-          :G.draft?'자료 수집 중':'게이트 미통과'}</button>
+      <button data-act="publish"${G.ready?'':' disabled'}>${pubLabel(G,isEdited(it))}</button>
     </div>
   </div>`;
 }
@@ -633,7 +680,7 @@ function render(){
       출처 링크를 직접 열어 값이 맞는지 확인한 뒤 판단하세요.
       값이 틀렸으면 카드 안 <b>고치기</b>에서 바로 바꿀 수 있습니다 — 별점과 총점은 루브릭으로 다시 계산됩니다.
       결정을 마치면 아래 <b>GitHub 에 발행</b>을 누릅니다 — 그 자리에서 data.js 에 병합해 커밋하고,
-      몇 분 뒤 사이트에 반영됩니다. 게이트를 통과하지 않은 건은 승인해도 발행되지 않습니다.
+      몇 분 뒤 사이트에 반영됩니다. 게이트에 막힌 건은 카드 안 <b>대표 확인 후 승인</b>에서 이유를 하나씩 확인하고 승인하면 발행할 수 있습니다.
       (<b>명령만 복사</b>는 예전 방식으로, 터미널에서 처리할 때만 씁니다.)
     </div>
     <div class="stat">
@@ -722,8 +769,11 @@ function patchCard(id){
   const g=gateNow(it);
   const pub=el.querySelector('.act button[data-act="publish"]');
   pub.disabled=!g.ready;
-  pub.textContent=g.ready?(ed?'고쳐서 발행':'발행')
-    :g.draft?'자료 수집 중':'게이트 미통과';
+  pub.textContent=pubLabel(g,ed);
+  if(!g.ready&&decision[id]==='publish'){delete decision[id];pub.classList.remove('sel-pub');updateBar();}
+  const ob=el.querySelector('.ovrbox');
+  /* 승인 칸에 이유를 쓰는 중이면 다시 그리지 않는다 — 쓰던 글이 날아간다 */
+  if(ob&&!ob.contains(document.activeElement))ob.innerHTML=overrideBox(it,g);
 
   /* 무엇이 막고 있는지 카드 위쪽 줄에 그대로 보여 준다 */
   const box=el.querySelector('.gatemsg');
@@ -757,7 +807,8 @@ function setEdit(id,path,raw){
   const orig=grp==='meta'?dig(it.proposed,key):dig(it.proposed,path);
   let val=raw;
   const isText = path==='facts.firstIngrCat' || path===BUY_FIELD
-              || path==='price.srcUrl' || path==='meta.name' || path==='meta.thumb';
+              || path==='price.srcUrl' || path==='meta.name' || path==='meta.thumb'
+              || path==='meta.specOrigin' || path==='meta.specNote';
   if(path==='price.wgOptions'){
     /* '2000, 6000, 11400' → [2000,6000,11400]. 게이트가 최소 용량인지 볼 때 쓴다. */
     const list=String(raw).split(/[,\s]+/).map(s=>Number(s)).filter(n=>n>0);
@@ -890,6 +941,33 @@ document.addEventListener('click',e=>{
     card.querySelector('[data-edit="facts.dmCarb"]').value=dm;
     setEdit(card.dataset.id,'facts.dmCarb',dm);
     toast(`건물기준 탄수 ${dm}% 로 채웠습니다`);
+    return;
+  }
+
+  const ovOk=e.target.closest('[data-ovr-ok]');
+  if(ovOk){
+    const cardEl=ovOk.closest('.card'), id=cardEl.dataset.id, it=itemById(id);
+    const box=ovOk.closest('.ovr');
+    const all=[...box.querySelectorAll('[data-ovr-i]')];
+    if(all.some(c=>!c.checked)){toast('막힌 이유를 모두 확인하고 체크해 주세요');return;}
+    const reason=box.querySelector('[data-ovr-reason]').value.trim();
+    if(reason.length<4){toast('승인 이유를 적어 주세요');return;}
+    const G=gateNow(it);
+    (edits[id]||(edits[id]={})).override={msgs:G.soft.map(f=>f.msg),reason,at:new Date().toISOString()};
+    saveEdits();
+    decision[id]='publish';
+    render();
+    document.querySelector(`.card[data-id="${CSS.escape(id)}"]`)?.classList.add('open');
+    toast('책임 승인했어요 — 아래 GitHub 에 발행을 누르면 올라갑니다');
+    return;
+  }
+  const ovNo=e.target.closest('[data-ovr-cancel]');
+  if(ovNo){
+    const id=ovNo.closest('.card').dataset.id;
+    if(edits[id]){delete edits[id].override; if(!Object.keys(edits[id]).length)delete edits[id];}
+    delete decision[id];
+    saveEdits();render();
+    document.querySelector(`.card[data-id="${CSS.escape(id)}"]`)?.classList.add('open');
     return;
   }
 
