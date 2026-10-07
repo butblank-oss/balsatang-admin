@@ -234,8 +234,8 @@ document.write(['engine/dict.js', 'engine/phrases.js', 'engine/engine.js',
                 'engine/policy.js', 'engine/gate1.js', 'engine/label.js']
   .map(function (f) { return '<scr' + 'ipt src="' + window.APP_BASE + f + '"><\/scr' + 'ipt>'; }).join(''));
 </script>
-<script src="github.js"></script>
-<script src="publish.js"></script>
+<script src="github.js?v=20261007b"></script>
+<script src="publish.js?v=20261007b"></script>
 <script>
 const RATING_LABEL={quality:'원료',carb:'탄수화물',additive:'첨가물',value:'가성비'};
 /* evidence 키('ratings.quality','price.p')를 사람이 읽는 이름으로 */
@@ -454,7 +454,8 @@ function labelBox(it){
     <h3 style="margin-top:0">라벨 붙여넣기</h3>
     <p class="d">제품 라벨의 <b>원재료명·보장성분·칼로리</b>를 통째로 복사해 넣으세요.
       썸네일 주소와 쿠팡 구매 링크도 같이 넣으면 함께 읽습니다. 형식은 신경 쓰지 않아도 됩니다.</p>
-    <textarea data-label rows="5" placeholder="원재료명: 신선한 닭고기(21%), 닭고기 분말(20%), …&#10;조단백질(이상): 35 %&#10;조지방(이상): 11 %&#10;…&#10;3070 kcal/kg&#10;https://… (썸네일)&#10;https://link.coupang.com/a/… (구매)"></textarea>
+    ${done?`<p class="d" style="margin:6px 0">읽은 값이 틀렸거나 지우고 싶으면 아래 글에서 그 부분을 고치거나 지운 뒤 <b>라벨 읽기</b>를 다시 누르세요. 다시 읽으면 이전 라벨 값은 새 값으로 바뀝니다.</p>`:''}
+    <textarea data-label rows="${done?8:5}" placeholder="원재료명: 신선한 닭고기(21%), 닭고기 분말(20%), …&#10;조단백질(이상): 35 %&#10;조지방(이상): 11 %&#10;…&#10;3070 kcal/kg&#10;https://… (썸네일)&#10;https://link.coupang.com/a/… (구매)">${done?esc(L.text||''):''}</textarea>
     <div class="labact">
       <button data-act="readlabel">라벨 읽기</button>
       ${done?`<button data-act="droplabel" class="ghost">지우기</button>`:''}

@@ -76,8 +76,11 @@ const PUB = {
        근거 문장도 같이 남긴다. 없으면 게이트가 '근거 누락' 으로 막는다. */
     const L = edit.label;
     if (L) {
-      p.ingredients = L.ingredients;
-      p.ga = { ...(p.ga || {}), ...L.ga };
+      /* 라벨이 못 읽은 칸(null)은 원래 값을 지우지 않는다. 수분 한 줄만 붙여넣어도
+         나머지 보장성분이 통째로 비던 것을 막는다. */
+      const gaIn = Object.fromEntries(Object.entries(L.ga || {}).filter(([, v]) => v != null));
+      if (L.ingredients?.length) p.ingredients = L.ingredients;
+      p.ga = { ...(p.ga || {}), ...gaIn };
       if (L.kcalPerKg != null) p.kcalPerKg = L.kcalPerKg;
       if (L.thumb) p.thumb = L.thumb;
       delete p.draft;
@@ -89,6 +92,12 @@ const PUB = {
       }];
       evidence = { ...evidence };
       const q = (k, text) => { evidence[k] = { src: i, quote: text }; };
+      /* 라벨에서 읽은 원료·보장성분·열량에도 근거를 단다. 안 달면 게이트가
+         '근거 누락: ga.moisture' 처럼 막는다 — 라벨로 새로 채운 칸은 원래 근거가 없다. */
+      const GA_KO = { protein: '조단백', fat: '조지방', fiber: '조섬유', moisture: '수분', ash: '조회분' };
+      for (const [k, v] of Object.entries(gaIn)) q(`ga.${k}`, `라벨 보장성분 — ${GA_KO[k] || k} ${v}%`);
+      if (L.ingredients?.length) q('ingredients', `라벨 원재료: ${L.ingredients.slice(0, 8).join(', ')}${L.ingredients.length > 8 ? ' …' : ''}`);
+      if (L.kcalPerKg != null) q('kcal', `라벨 열량 — ${L.kcalPerKg} kcal/kg`);
       q('facts.protein', `라벨 보장성분 — 조단백 ${L.ga.protein}%`);
       q('facts.firstIngrCat', `원료 표기 1번: ${L.ingredients[0] ?? '—'}`);
       q('facts.cautionN', `원료 ${L.ingredients.length}종 중 주의 ${L.dist?.caution ?? '?'}종`);

@@ -72,12 +72,14 @@ const EMBED = {
   review: { src:'review.html', title:'발행 심사',
             note:'수집된 사료를 검토하고 발행합니다. 발행하면 data.js 에 병합되어 커밋됩니다.' }
 };
+/* iframe 주소에 시각을 붙인다. GitHub Pages 가 파일마다 10분 캐시를 걸어서,
+   고친 심사 화면을 올려도 옛 화면(어두운 테마·옛 문구)이 계속 떴다. */
 function pgEmbed(k){
   const e = EMBED[k];
   el('wrap').innerHTML = `
     <div style="margin-bottom:10px;padding:9px 13px;border-radius:8px;background:var(--pri-soft);
          border:1px solid #E6EEFD;color:#1F57C8;font-size:12px;line-height:1.55">${e.note}</div>
-    <iframe src="${e.src}" title="${e.title}"
+    <iframe src="${e.src}?v=${Date.now()}" title="${e.title}"
       style="width:100%;height:calc(100vh - 132px);min-height:600px;border:1px solid var(--line);
              border-radius:12px;background:var(--bg);display:block"></iframe>`;
 }
