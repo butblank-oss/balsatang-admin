@@ -9,13 +9,13 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <style>
 :root{
-  --bg:#0D0F14; --panel:#151922; --panel2:#1B2029; --line:#252B38; --line2:#333B4D;
+  --bg:#F4F6F9; --panel:#FFFFFF; --panel2:#EEF1F5; --line:#DDE2EA; --line2:#C9D0DB;
   /* 어두운 배경에서 읽히는 최소선. muted #5A6376 은 2.7~3.2:1,
      sub #7C8698 은 4.5:1 언저리라 작은 글자가 안 읽혔다. 한 단계씩 밝혔다. */
-  --ink:#E8EBF0; --ink2:#B4BCCB; --sub:#949FB3; --muted:#838DA3;
-  --pri:#2F6FED; --pri-d:#245BC9; --pri-soft:#16233D;
-  --good:#22C55E; --good-soft:#0F2A1A; --warn:#F59E0B; --warn-soft:#2A2010;
-  --bad:#EF4444; --bad-soft:#2A1315;
+  --ink:#161A22; --ink2:#39404D; --sub:#545D6E; --muted:#667085;
+  --pri:#2F6FED; --pri-d:#1F4FB5; --pri-soft:#E6EEFD;
+  --good:#15803D; --good-soft:#E6F5EB; --warn:#B45309; --warn-soft:#FDF3E1;
+  --bad:#C62828; --bad-soft:#FDECEC;
   --r:8px; --r-lg:12px; --t:.16s cubic-bezier(.4,0,.2,1);
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -28,7 +28,7 @@ a{color:var(--pri-ink);text-decoration:none}
 ::-webkit-scrollbar{width:10px;height:10px}
 ::-webkit-scrollbar-thumb{background:var(--line2);border-radius:5px;border:2px solid var(--bg)}
 
-.top{position:sticky;top:0;z-index:20;background:rgba(13,15,20,.94);backdrop-filter:blur(8px);
+.top{position:sticky;top:0;z-index:20;background:rgba(244,246,249,.94);backdrop-filter:blur(8px);
   border-bottom:1px solid var(--line);padding:13px 18px;display:flex;align-items:center;gap:12px}
 .top h1{font-size:16px;font-weight:700;letter-spacing:-.02em}
 .top .meta{color:var(--sub);font-size:12px}
@@ -47,7 +47,7 @@ a{color:var(--pri-ink);text-decoration:none}
   background:var(--panel2);border:1px solid var(--line)}
 .chip{height:28px;padding:0 11px;border-radius:99px;font-size:12px;font-weight:600;
   background:var(--panel2);border:1px solid var(--line);color:var(--sub)}
-.chip.on{background:var(--pri-soft);border-color:var(--pri);color:#9DBBF5}
+.chip.on{background:var(--pri-soft);border-color:var(--pri);color:#1F57C8}
 
 table{width:100%;border-collapse:collapse}
 th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
@@ -78,7 +78,7 @@ td.when{font-variant-numeric:tabular-nums;color:var(--sub);font-size:11.5px;whit
 .pill{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:99px;
   font-size:10.5px;font-weight:700;border:1px solid}
 .pill.ok{background:var(--good-soft);border-color:var(--good);color:var(--good)}
-.pill.no{background:var(--bad-soft);border-color:var(--bad);color:#FCA5A5}
+.pill.no{background:var(--bad-soft);border-color:var(--bad);color:#B91C1C}
 .pill.wa{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
 
 /* 편집은 팝업이 아니라 페이지 전환이다.
@@ -113,7 +113,7 @@ td.when{font-variant-numeric:tabular-nums;color:var(--sub);font-size:11.5px;whit
   padding:11px 13px;font-size:12px;color:var(--ink2);line-height:1.7}
 .derived b{color:var(--ink)}
 
-.dock{position:fixed;left:0;right:0;bottom:0;z-index:25;background:rgba(21,25,34,.97);
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:25;background:rgba(255,255,255,.97);
   backdrop-filter:blur(10px);border-top:1px solid var(--line);padding:12px 18px}
 .dock .in{max-width:1080px;margin:0 auto;display:flex;gap:10px;align-items:center}
 .dock .c{flex:1;font-size:12px;color:var(--sub)}
@@ -127,12 +127,12 @@ td.when{font-variant-numeric:tabular-nums;color:var(--sub);font-size:11.5px;whit
 
 .empty{text-align:center;padding:60px 20px;color:var(--muted)}
 .empty b{display:block;color:var(--sub);font-size:15px;margin-bottom:8px}
-.note{background:var(--pri-soft);border:1px solid #23386b;border-radius:var(--r);padding:11px 13px;
-  font-size:12px;color:#9DBBF5;line-height:1.6;margin-bottom:14px}
-.note.warn{background:var(--warn-soft);border-color:#4a3a16;color:#FCD34D}
+.note{background:var(--pri-soft);border:1px solid #E6EEFD;border-radius:var(--r);padding:11px 13px;
+  font-size:12px;color:#1F57C8;line-height:1.6;margin-bottom:14px}
+.note.warn{background:var(--warn-soft);border-color:#F2D49B;color:#92400E}
 
 /* 템플릿 고르기 시트 */
-#sheet{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.55);display:none}
+#sheet{position:fixed;inset:0;z-index:50;background:rgba(15,23,42,.35);display:none}
 #sheet.on{display:block}
 #sheet .sh-in{position:absolute;right:0;top:0;bottom:0;width:min(460px,100%);background:var(--panel);
   border-left:1px solid var(--line);display:flex;flex-direction:column}

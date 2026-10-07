@@ -26,6 +26,26 @@ const PUB = {
   DATA: 'data.js',
   STAGING: 'data/staging',
 
+  /* ── 대표 책임 승인 ──
+     게이트가 막은 항목도 대표가 이유를 하나씩 확인하고 승인하면 발행한다.
+     예: 원재료(한국)와 보장성분(해외)이 다른 출처라 막혔지만, 대표가 국내 판매 봉투를
+     직접 보고 값이 맞다고 판단한 경우. 승인 기록(무엇을 넘겼는지·왜)은 발행 데이터의
+     src.override 에 남는다.
+
+     ⚠ 아래는 승인으로도 못 넘긴다. 값 자체가 비어 있거나 형식이 깨져 화면이 그릴 수
+     없는 것들이다 — 넘기면 별점이 비고 화면이 깨진다. 고치기 칸에서 값을 채워야 풀린다. */
+  HARD: new Set(['E_ITEM_FIELD', 'E_FIELD', 'E_TYPE', 'E_ENUM', 'E_INGR_NONE', 'E_INGR',
+    'E_FACTS_NONE', 'E_FACTS', 'E_RATING', 'E_RATING_RUBRIC', 'E_SCORE',
+    'E_DUP', 'E_DUP_BATCH', 'E_DRAFT', 'E_GATE']),
+
+  /* 승인으로 넘긴 탈락을 뺀 나머지. 메시지 단위로 맞춘다 — 승인한 뒤 값을 또 고쳐
+     메시지가 바뀌면(숫자가 달라지면) 다시 확인해야 한다. */
+  afterOverride(fail, ov) {
+    if (!ov || !Array.isArray(ov.msgs) || !String(ov.reason || '').trim()) return fail;
+    const ok = new Set(ov.msgs);
+    return fail.filter(f => this.HARD.has(f.code) || !ok.has(f.msg));
+  },
+
   /* 스테이징 디렉터리의 배치 파일 목록. _ 로 시작하는 것과 review.json 은 배치가 아니다. */
   async batchFiles() {
     const r = await GH.api(`/repos/${GH.owner}/${GH.repo}/contents/${this.STAGING}?ref=${GH.branch}`);
@@ -201,13 +221,18 @@ const PUB = {
         /* 아직 라벨을 못 본 항목은 검사할 단계가 아니다 — 발행도 될 수 없다. */
         const fail = item.proposed.draft === true
           ? [{ code: 'E_DRAFT', msg: '자료 수집 중 — 라벨을 채워야 발행할 수 있습니다' }]
-          : gateOk(item);
+          : this.afterOverride(gateOk(item), edits[id]?.override);
         if (fail.length) {
           refused.push({ stagingId: id, label: `${item.proposed.brand} ${item.proposed.name}`, fail });
           keep.push(raw);
           continue;
         }
         const { food, detail } = ENGINE.publishRecord(item, newId(), now);
+        /* 해외 정보 안내문은 대표가 직접 쓴 문구가 있을 때만 싣는다. 비어 있으면
+           프론트가 브랜드 이름으로 기본 문구를 만든다. */
+        if (item.proposed.specNote) food.specNote = item.proposed.specNote;
+        const ov = edits[id]?.override;
+        if (ov) food.src.override = { msgs: ov.msgs, reason: ov.reason, at: ov.at };
         published.push(food);
         if (detail) details[food.id] = detail;
         touched = true;

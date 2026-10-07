@@ -110,7 +110,7 @@ function shell(inner) {
   el('wrap').innerHTML = `
   <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px">
     <div class="seg" id="anRange">${[[1, '오늘'], [7, '7일'], [30, '30일'], [90, '90일']].map(([d, l]) =>
-      `<button class="${range.days === d ? 'on' : ''}" data-d="${d}" style="${range.days === d ? 'background:var(--pri-soft);border-color:var(--pri);color:#7FA9FF' : ''}">${l}</button>`).join('')}</div>
+      `<button class="${range.days === d ? 'on' : ''}" data-d="${d}" style="${range.days === d ? 'background:var(--pri-soft);border-color:var(--pri);color:#1F57C8' : ''}">${l}</button>`).join('')}</div>
     <span style="font-size:11px;color:var(--muted)" id="anRangeTxt"></span>
     <div style="flex:1"></div>
     <button class="btn sm" id="anRefresh">새로고침</button>
@@ -170,7 +170,7 @@ async function page() {
     wireChart(d);
   } catch (e) {
     if (e.auth) { openLogin(e.message); return; }
-    el('anBody').innerHTML = `<div class="card"><div class="empty" style="color:#FF8088">${$esc(e.message)}</div></div>`;
+    el('anBody').innerHTML = `<div class="card"><div class="empty" style="color:#B91C1C">${$esc(e.message)}</div></div>`;
   }
 }
 

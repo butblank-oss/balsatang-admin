@@ -313,6 +313,11 @@ const FIELDS = [
   { k: 'name', label: '제품명', wide: true },
   { k: 'type', label: '제형', sel: TYPE_KO },
   { k: 'country', label: '원산지', sel: COUNTRY_KO },
+  /* 해외 본사(글로벌) 정보면 프론트 상세에 '※ ○○ 글로벌에서 제시되는 기본 정보로서…'
+     안내가 붙는다. 안내문 칸을 비우면 브랜드 이름으로 기본 문구를 만든다. */
+  { k: 'specOrigin', label: '성분 정보 기준', sel: { domestic: '국내 표시사항', overseas: '해외 본사(글로벌) 정보' } },
+  { k: 'specNote', label: '해외 정보 안내문', wide: true,
+    hint: '비우면 기본 문구: ※ {브랜드} 글로벌에서 제시되는 기본 정보로서, 국내 사료관리법에 따른 제품 표시사항과 일부 다를 수 있습니다.' },
   { k: 'rx', label: '처방식 여부', sel: { '': '일반', '1': '처방식' }, bool: true },
   /* 프론트는 status === 'published' 인 것만 보여준다. 내려도 데이터는 남으니
      언제든 되돌릴 수 있다 — 지우는 것과 다르다. */
@@ -538,7 +543,7 @@ function renderIngrOut(f) {
   const box = $('#ingrOut'); if (!box) return;
   const d = detailOf(f), ingr = d.ingr || [];
   if (!ingr.length) { box.innerHTML = '원료를 넣으면 여기서 판정을 보여줘요.'; return; }
-  const COLOR = { safe: 'var(--good)', caution: 'var(--warn)', danger: '#FCA5A5', unknown: 'var(--sub)' };
+  const COLOR = { safe: 'var(--good)', caution: 'var(--warn)', danger: '#B91C1C', unknown: 'var(--sub)' };
   const KO = { safe: '양호', caution: '논쟁중', danger: '주의', unknown: '사전에 없음' };
   const unknown = ingr.filter(i => i.safe === 'unknown');
   box.innerHTML = `
@@ -910,7 +915,7 @@ function commitMessage(dl) {
   const body = dl.map(f => {
     const o = JSON.parse(S.orig.get(f.id));
     const ch = [];
-    for (const k of ['brand', 'name', 'brandSlug', 'type', 'country', 'rx', 'thumb'])
+    for (const k of ['brand', 'name', 'brandSlug', 'type', 'country', 'rx', 'specOrigin', 'specNote', 'thumb'])
       if (JSON.stringify(f[k] ?? null) !== JSON.stringify(o[k] ?? null)) ch.push(k);
     for (const k of ['p', 'wg', 'shop', 'buyUrl'])
       if (JSON.stringify(f.price?.[k] ?? null) !== JSON.stringify(o.price?.[k] ?? null)) ch.push('price.' + k);

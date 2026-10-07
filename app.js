@@ -76,7 +76,7 @@ function pgEmbed(k){
   const e = EMBED[k];
   el('wrap').innerHTML = `
     <div style="margin-bottom:10px;padding:9px 13px;border-radius:8px;background:var(--pri-soft);
-         border:1px solid #23386b;color:#9DBBF5;font-size:12px;line-height:1.55">${e.note}</div>
+         border:1px solid #E6EEFD;color:#1F57C8;font-size:12px;line-height:1.55">${e.note}</div>
     <iframe src="${e.src}" title="${e.title}"
       style="width:100%;height:calc(100vh - 132px);min-height:600px;border:1px solid var(--line);
              border-radius:12px;background:var(--bg);display:block"></iframe>`;
@@ -287,7 +287,7 @@ function pgIngr(){
 function ingrShell(){
   const unknown = store.unknownIngredients();
   return `
-  ${unknown.length?`<div class="card" style="margin-bottom:14px;border-color:#4A3A12;background:#17130A">
+  ${unknown.length?`<div class="card" style="margin-bottom:14px;border-color:#F2D49B;background:#FDF6E7">
     <div style="display:flex;align-items:center;gap:9px">
       ${ico('alert',16)}<b style="font-size:12.5px">성분 사전에 없는 원료 ${unknown.length}종</b>
       <div style="flex:1"></div>
@@ -373,7 +373,7 @@ function pgTags(){
   };
   el('wrap').innerHTML = `
     <div class="card" style="margin-bottom:14px;border-color:var(--pri);background:var(--pri-soft)">
-      <div style="font-size:11.5px;line-height:1.75;color:#9DBEFF">
+      <div style="font-size:11.5px;line-height:1.75;color:#1F57C8">
         소비자 <b>맞춤찾기</b>(우리 아이를 알려주세요) 화면에 보이는 고민·나이·체형 옵션과
         아이콘·노출 순서를 관리해요. 옵션의 식별값(key)은 앱 코드와 연결돼 있어 수정할 수 없고,
         보이는 방식만 바꿀 수 있어요.</div></div>
