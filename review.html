@@ -70,6 +70,15 @@ tr.diff td:first-child{color:var(--bad);font-weight:600}
 .srcbox .d{color:var(--muted);font-size:11px;margin-top:4px}
 .quote{border-left:2px solid var(--line);padding-left:9px;margin-top:6px;color:var(--sub);font-size:12px}
 .quote b{color:var(--ink);font-weight:600;display:block;font-size:11px;margin-bottom:2px}
+/* 등록 제품명 ↔ A등급 출처 제목을 나란히 — 엉뚱한 제품에서 성분을 떠왔는지 사람이 비교 */
+.namecmp{background:var(--panel2);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;margin-bottom:10px}
+.namecmp .nc-row{display:flex;gap:8px;align-items:baseline;padding:3px 0;font-size:13px}
+.namecmp .nc-k{flex-shrink:0;min-width:116px;color:var(--sub);font-size:11px;font-weight:600}
+.namecmp .nc-v{color:var(--ink);word-break:break-all}
+.namecmp b{color:var(--ink);font-weight:700;word-break:break-all}
+.namecmp .nc-warn{color:var(--bad);font-size:12px}
+.namecmp .nc-h{margin-top:6px;color:var(--muted);font-size:11px}
+.srcbox .stitle{font-weight:600;font-size:13px;margin-top:6px;color:var(--ink)}
 
 .msg{font-size:12px;padding:7px 10px;border-radius:var(--r);margin-bottom:5px;border:1px solid}
 .msg.f{background:var(--bad-soft);border-color:#4a2226;color:#FCA5A5}
@@ -386,15 +395,32 @@ function auditTable(it){
 }
 
 function sourceBlock(it){
-  return (it.sources||[]).map((s,i)=>{
+  const name=`${it.proposed?.brand??''} ${it.proposed?.name??''}`.trim();
+  /* 성분 근거가 되는 A등급 출처(제조사·수입사·기관·라벨)의 제목을 제품명과 나란히 놓는다.
+     가격용 retail(쿠팡) 제목이 아니라 — 성분을 '어느 제품에서' 떠왔는지 봐야 한다.
+     로얄캐닌 하이포가 미국의 다른 제품(hydrolyzed)을 성분 출처로 달고 통과한 사고가 있었다.
+     두 이름을 떨어뜨려 두면 사람이 비교하지 않는다 — 나란히가 곧 기능이다.
+     A등급 판정은 policy.js SOURCE_GRADE 한 곳에서 읽는다(게이트와 같은 기준). */
+  const grade=r=>(typeof POLICY!=='undefined'?POLICY.SOURCE_GRADE?.[r]:null);
+  const spec=(it.sources||[]).filter(s=>grade(s.role)==='A');
+  const cmp=`<div class="namecmp">
+    <div class="nc-row"><span class="nc-k">등록 제품명</span><b>${esc(name||'—')}</b></div>
+    ${spec.length
+      ? spec.map(s=>`<div class="nc-row"><span class="nc-k">출처 제목 · ${esc(ROLE_LABEL[s.role]||s.role)}</span><span class="nc-v">${esc(s.title||'(제목 없음)')}</span></div>`).join('')
+      : `<div class="nc-row nc-warn">성분 근거가 될 A등급 출처 제목이 없습니다 — 어느 제품에서 떠온 성분인지 확인할 수 없습니다</div>`}
+    <div class="nc-h">위 두 이름이 같은 제품인지 보세요 — 다르면 다른 제품의 성분입니다.</div>
+  </div>`;
+  const boxes=(it.sources||[]).map((s,i)=>{
     const quotes=Object.entries(it.evidence||{}).filter(([,e])=>e.src===i);
     return `<div class="srcbox">
       <span class="role ${s.role==='retail'?'b':''}">${esc(ROLE_LABEL[s.role]||s.role)}</span>
+      ${s.title?`<div class="stitle">${esc(s.title)}</div>`:''}
       <a class="u" href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.url)} ↗</a>
-      <div class="d">확인: ${esc((s.fetchedAt||'').slice(0,10))}${s.title?' · '+esc(s.title):''}</div>
+      <div class="d">확인: ${esc((s.fetchedAt||'').slice(0,10))}</div>
       ${quotes.map(([k,e])=>`<div class="quote"><b>${esc(evLabel(k))}</b>${esc(e.quote)}</div>`).join('')}
     </div>`;
   }).join('') || '<div class="msg f">출처가 없습니다</div>';
+  return cmp+boxes;
 }
 
 /* ── 제품명 ──
