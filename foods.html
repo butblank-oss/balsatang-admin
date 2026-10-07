@@ -12,9 +12,9 @@
   --bg:#F4F6F9; --panel:#FFFFFF; --panel2:#EEF1F5; --line:#DDE2EA; --line2:#C9D0DB;
   /* 어두운 배경에서 읽히는 최소선. muted #5A6376 은 2.7~3.2:1,
      sub #7C8698 은 4.5:1 언저리라 작은 글자가 안 읽혔다. 한 단계씩 밝혔다. */
-  --ink:#161A22; --ink2:#39404D; --sub:#545D6E; --muted:#667085;
+  --ink:#161A22; --ink2:#39404D; --sub:#545D6E; --muted:#586174;
   --pri:#2F6FED; --pri-d:#1F4FB5; --pri-soft:#E6EEFD;
-  --good:#15803D; --good-soft:#E6F5EB; --warn:#B45309; --warn-soft:#FDF3E1;
+  --good:#136A33; --good-soft:#E6F5EB; --warn:#9A4507; --warn-soft:#FDF3E1;
   --bad:#C62828; --bad-soft:#FDECEC;
   --r:8px; --r-lg:12px; --t:.16s cubic-bezier(.4,0,.2,1);
 }
@@ -38,6 +38,7 @@ a{color:var(--pri-ink);text-decoration:none}
   background:var(--panel2);color:var(--ink2);border:1px solid var(--line);transition:all var(--t)}
 .btn:hover{border-color:var(--line2);color:var(--ink)}
 .btn.pri{background:var(--pri);border-color:var(--pri);color:#fff}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
 .btn.pri:hover{background:var(--pri-d)}
 .btn.ok{background:var(--good-soft);border-color:var(--good);color:var(--good)}
 .btn:disabled{opacity:.4;cursor:not-allowed}

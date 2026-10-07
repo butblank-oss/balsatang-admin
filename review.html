@@ -7,9 +7,9 @@
 <link rel="icon" href="./favicon.svg">
 <title>발사탕 · 발행 심사</title>
 <style>
-:root{--bg:#F4F6F9;--panel:#FFFFFF;--panel2:#EEF1F5;--line:#DDE2EA;--ink:#161A22;--sub:#545D6E;--muted:#667085;
---pri:#2F6FED;--pri-d:#1F4FB5;--pri-soft:#E6EEFD;--good:#15803D;--good-soft:#E6F5EB;
---warn:#B45309;--warn-soft:#FDF3E1;--bad:#C62828;--bad-soft:#FDECEC;--r:8px;--r-lg:12px;--t:.16s cubic-bezier(.4,0,.2,1)}
+:root{--bg:#F4F6F9;--panel:#FFFFFF;--panel2:#EEF1F5;--line:#DDE2EA;--ink:#161A22;--sub:#545D6E;--muted:#586174;
+--pri:#2F6FED;--pri-d:#1F4FB5;--pri-soft:#E6EEFD;--good:#136A33;--good-soft:#E6F5EB;
+--warn:#9A4507;--warn-soft:#FDF3E1;--bad:#C62828;--bad-soft:#FDECEC;--r:8px;--r-lg:12px;--t:.16s cubic-bezier(.4,0,.2,1)}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--ink);font-family:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;
   font-size:14px;line-height:1.5;padding-bottom:120px;-webkit-font-smoothing:antialiased}
@@ -1050,7 +1050,7 @@ async function loadReview(){
 document.getElementById('tokenBtn').addEventListener('click',async()=>{
   const v=prompt(
     'fine-grained personal access token 을 넣어주세요.\n'+
-    '· Repository access: butblank-oss/gsso_scat 하나만\n'+
+    '· Repository access: butblank-oss/balsatang 하나만\n'+
     '· Permissions: Contents = Read and write\n'+
     '· Expiration: 되도록 짧게\n\n'+
     '이 브라우저에만 저장되고 저장소에는 들어가지 않아요. 비우면 삭제돼요.',

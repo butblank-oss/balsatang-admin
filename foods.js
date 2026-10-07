@@ -353,11 +353,13 @@ function renderEditor() {
       <div style="flex:1"></div>
       <span style="font-size:11.5px;color:var(--muted)">고친 내용은 아래 <b style="color:var(--sub)">GitHub 에 커밋</b>을 눌러야 반영돼요</span>
       <button class="btn" data-reset>이 사료 되돌리기</button>
+      <button class="btn danger" data-delete>사료 삭제</button>
     </div>
     <div id="panelBody"></div>`;
   $('#panelBody').innerHTML = panelHtml(f);
   bindPanel(f);
   $('[data-back]').onclick = closePanel;
+  $('[data-delete]').onclick = () => deleteFood(f);
   $('[data-reset]').onclick = () => {
     if (!confirm('이 사료의 수정을 전부 되돌릴까요?')) return;
     const o = JSON.parse(S.orig.get(f.id));
@@ -928,6 +930,63 @@ function commitMessage(dl) {
   return `${head}\n\n${body}\n\n어드민 화면에서 커밋했습니다.`;
 }
 
+async function pushCacheBust(files) {
+  const html = await GH.getFileOrNull('index.html');
+  if (!html) return;
+  const stamp = new Date().toISOString().replace(/\D/g, '').slice(0, 12);
+  const next = html.text.replace(/\?v=[0-9]+/g, `?v=${stamp}`);
+  if (next !== html.text) files.push({ path: 'index.html', text: next });
+}
+
+/* ── 사료 삭제 ──
+   '내림'(노출 상태)은 데이터를 남기고 화면에서만 감춘다. 삭제는 data.js 에서
+   사료와 상세(DETAIL)를 아예 지운다 — 되돌리려면 GitHub 커밋 기록에서 되살려야 한다.
+   그래서 이름을 직접 쳐서 확인받고, 다른 수정과 섞이지 않게 혼자 커밋한다. */
+async function deleteFood(f) {
+  const others = dirtyList().filter(x => x.id !== f.id);
+  if (others.length) {
+    toast(`저장 안 한 수정이 ${others.length}건 있어요 — 먼저 커밋하거나 되돌린 뒤 삭제해 주세요`, true);
+    return;
+  }
+  const typed = prompt(
+    `'${f.brand} ${f.name}' 을(를) 사이트 데이터에서 완전히 지웁니다.\n` +
+    `잠시 숨기기만 하려면 취소하고 '노출 상태 → 내림' 을 쓰세요.\n\n` +
+    `지우려면 제품명을 그대로 적어 주세요:\n${f.name}`);
+  if (typed === null) return;
+  if (typed.trim() !== f.name.trim()) { toast('제품명이 달라서 지우지 않았어요', true); return; }
+
+  try {
+    const cur = await GH.getFile(PATH);
+    if (cur.sha !== S.sha) {
+      toast('그 사이 다른 곳에서 data.js 가 바뀌었어요 — 새로고침한 뒤 다시 해 주세요', true);
+      return;
+    }
+    const keepFoods = S.foods, keepDetail = S.detail[f.id];
+    S.foods = S.foods.filter(x => x.id !== f.id);
+    delete S.detail[f.id];
+    const files = [{ path: PATH, text: serialize() }];
+    await pushCacheBust(files);
+    let commit;
+    try {
+      commit = await GH.commitFiles(files,
+        `사료 삭제 — ${f.brand} ${f.name}\n\nid: ${f.id}\n어드민 화면에서 삭제했습니다.`);
+    } catch (e) {
+      S.foods = keepFoods;                       /* 실패하면 화면도 원래대로 */
+      if (keepDetail !== undefined) S.detail[f.id] = keepDetail;
+      throw e;
+    }
+    S.sha = (await GH.getFile(PATH)).sha;
+    S.orig.delete(f.id); S.origDetail.delete(f.id);
+    $('#meta').textContent = `${S.foods.length}종 · ${S.sha.slice(0, 7)}`;
+    S.cur = null;
+    $('#wrap').innerHTML = '';
+    render();
+    toast(`삭제했어요 — ${commit.sha.slice(0, 7)}. 몇 분 뒤 사이트에서 사라져요`);
+  } catch (e) {
+    toast(e.message, true);
+  }
+}
+
 async function commit() {
   const dl = dirtyList();
   if (!dl.length) return;
@@ -964,12 +1023,7 @@ async function commit() {
        GitHub Pages 가 모든 파일에 max-age=600 을 걸어서, 고쳐 올려도 브라우저는
        같은 주소의 옛 data.js 를 계속 읽었다. 두 캐시가 겹치면 20분 넘게 안 바뀐다.
        커밋할 때마다 번호를 올려 주소를 바꾼다. */
-    const html = await GH.getFileOrNull('index.html');
-    if (html) {
-      const stamp = new Date().toISOString().replace(/\D/g, '').slice(0, 12);
-      const next = html.text.replace(/\?v=[0-9]+/g, `?v=${stamp}`);
-      if (next !== html.text) files.push({ path: 'index.html', text: next });
-    }
+    await pushCacheBust(files);
 
     const commit = await GH.commitFiles(files, commitMessage(dl));
     /* 한 커밋에 두 파일을 넣으면 data.js 의 새 sha 를 응답에서 못 받는다. 다시 읽는다. */
@@ -992,7 +1046,7 @@ async function askToken() {
   const cur = GH.token;
   const v = prompt(
     'fine-grained personal access token 을 넣어주세요.\n' +
-    '· Repository access: butblank-oss/gsso_scat 하나만\n' +
+    '· Repository access: butblank-oss/balsatang 하나만\n' +
     '· Permissions: Contents = Read and write\n' +
     '· Expiration: 되도록 짧게\n\n' +
     '이 브라우저에만 저장되고 저장소에는 들어가지 않아요. 비우면 삭제돼요.',
