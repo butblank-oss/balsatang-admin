@@ -14,7 +14,10 @@
 const CFG_KEY = 'balsatang.sb.cfg';
 const SES_KEY = 'balsatang.sb.session';
 /* 프론트 track.js 의 TRACK_CFG 와 같은 값. 비워 두면 로그인 창에서 받는다. */
-const DEFAULT_CFG = { url: '', key: '' };
+const DEFAULT_CFG = {
+  url: 'https://lcynjpiclpedxflfvhns.supabase.co',
+  key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxjeW5qcGljbHBlZHhmbGZ2aG5zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzMTE4MTUsImV4cCI6MjEwNjg4NzgxNX0.NHEB02OtA0zYevKMeWnIDQaT7nl-toqn7Nka---8tZE'
+};
 
 const ls = {
   get(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch { return null; } },
