@@ -6,13 +6,14 @@
 <meta name="robots" content="noindex,nofollow">
 <link rel="icon" href="./favicon.svg">
 <title>발사탕 · 발행 심사</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <style>
-:root{--bg:#F4F6F9;--panel:#FFFFFF;--panel2:#EEF1F5;--line:#DDE2EA;--ink:#161A22;--sub:#545D6E;--muted:#586174;
---pri:#2F6FED;--pri-d:#1F4FB5;--pri-soft:#E6EEFD;--good:#136A33;--good-soft:#E6F5EB;
---warn:#9A4507;--warn-soft:#FDF3E1;--bad:#C62828;--bad-soft:#FDECEC;--r:8px;--r-lg:12px;--t:.16s cubic-bezier(.4,0,.2,1)}
+:root{--bg:#F6F7F9;--panel:#FFFFFF;--panel2:#F8F9FB;--line:#E4E7EC;--ink:#2A2F3A;--sub:#5C6370;--muted:#6B7280;
+--pri:#2F6FED;--pri-ink:#1F57C8;--pri-d:#1F4FB5;--pri-soft:#EEF3FD;--good:#136A33;--good-soft:#EFF8F2;
+--warn:#8A4B08;--warn-soft:#FFF8EC;--bad:#A61B1B;--bad-soft:#FFF4F4;--r:8px;--r-lg:12px;--t:.16s cubic-bezier(.4,0,.2,1)}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--ink);font-family:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;
-  font-size:14px;line-height:1.5;padding-bottom:120px;-webkit-font-smoothing:antialiased}
+  font-size:14px;line-height:1.6;padding-bottom:120px;-webkit-font-smoothing:antialiased}
 a{color:var(--pri-ink);text-decoration:none}
 a:hover{text-decoration:underline}
 /* 브라우저 기본 스타일이 입력칸 글자를 검게 칠한다. 어두운 배경이라 안 보였다 —
@@ -27,6 +28,21 @@ button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit
 .ovr [data-ovr-reason]{width:100%;margin:8px 0;padding:9px 10px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
 .ovr button{padding:8px 14px;border-radius:var(--r);border:none;background:var(--pri);color:#fff;font-weight:600;cursor:pointer}
 .ovr button.ghost{background:none;border:1px solid var(--line);color:var(--sub)}
+/* ── 심사 카드 구역 (제품 · 성분표 · 가격 · 출처) ── */
+.blk{margin:14px 0 0;padding:14px 16px;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--panel)}
+.blk>h3{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:10px;display:flex;gap:8px;align-items:baseline}
+.blk>h3 .hint{font-size:12px;font-weight:500;color:var(--muted)}
+.edit.spec{grid-template-columns:repeat(6,minmax(90px,1fr))}
+@media(max-width:720px){.edit.spec{grid-template-columns:repeat(3,1fr)}}
+.calcline{margin-top:8px;font-size:13px;color:var(--sub)}
+.calcline b{color:var(--ink)}
+.links{margin-top:8px;font-size:12.5px;color:var(--sub);display:flex;gap:12px;flex-wrap:wrap}
+.links a{color:var(--pri-ink);font-weight:600}
+details.more{margin-top:10px}
+details.more>summary{cursor:pointer;font-size:12.5px;color:var(--pri-ink);font-weight:600;list-style:none}
+details.more>summary::before{content:'▸ '}
+details.more[open]>summary::before{content:'▾ '}
+details.more>div,details.more>table{margin-top:8px}
 code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
 
 .top{position:sticky;top:0;z-index:20;background:rgba(244,246,249,.92);backdrop-filter:blur(8px);
@@ -44,7 +60,7 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
 .batch>h2{font-size:12px;color:var(--sub);font-weight:600;margin-bottom:10px;letter-spacing:.02em}
 
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);margin-bottom:12px;overflow:hidden}
-.card.blocked{opacity:.72}
+.card.blocked{}
 .hd{display:flex;align-items:flex-start;gap:10px;padding:14px;cursor:pointer;user-select:none}
 .hd:hover{background:var(--panel2)}
 .hd .t{flex:1;min-width:0}
@@ -90,8 +106,8 @@ tr.diff td:first-child{color:var(--bad);font-weight:600}
 .srcbox .stitle{font-weight:600;font-size:13px;margin-top:6px;color:var(--ink)}
 
 .msg{font-size:12px;padding:7px 10px;border-radius:var(--r);margin-bottom:5px;border:1px solid}
-.msg.f{background:var(--bad-soft);border-color:#F3C1C1;color:#B91C1C}
-.msg.w{background:var(--warn-soft);border-color:#F2D49B;color:#92400E}
+.msg.f{background:var(--bad-soft);border-color:#F2D3D3;color:var(--bad)}
+.msg.w{background:var(--warn-soft);border-color:#EFDFC4;color:var(--warn)}
 
 .act{display:flex;gap:8px;padding:12px 14px;border-top:1px solid var(--line);background:var(--panel2)}
 .act button{flex:1;padding:10px;border-radius:var(--r);border:1px solid var(--line);background:transparent;
@@ -129,8 +145,8 @@ tr.diff td:first-child{color:var(--bad);font-weight:600}
 .f.ch input,.f.ch select{border-color:var(--warn);background:var(--warn-soft)}
 .f .was{font-size:10px;color:var(--warn);min-height:12px}
 /* 라벨 붙여넣기 — 이 화면에서 제일 중요한 칸이라 눈에 띄게 둔다 */
-.lab{margin-bottom:14px;padding:12px;border:1px solid var(--pri);background:var(--pri-soft);border-radius:var(--r)}
-.lab.ok{border-color:var(--good);background:var(--good-soft)}
+.lab{margin-bottom:14px;padding:12px 14px;border:1px solid var(--line);background:var(--panel2);border-radius:var(--r)}
+.lab.ok{border-color:var(--line);background:var(--panel2)}
 .lab textarea{width:100%;margin-top:8px;padding:9px 11px;border-radius:var(--r);resize:vertical;
   background:var(--panel2);border:1px solid var(--line);font-size:12.5px;line-height:1.6}
 .lab textarea:focus{outline:none;border-color:var(--pri)}
@@ -243,8 +259,8 @@ document.write(['engine/dict.js', 'engine/phrases.js', 'engine/engine.js',
                 'engine/policy.js', 'engine/gate1.js', 'engine/label.js']
   .map(function (f) { return '<scr' + 'ipt src="' + window.APP_BASE + f + '"><\/scr' + 'ipt>'; }).join(''));
 </script>
-<script src="github.js?v=20261007b"></script>
-<script src="publish.js?v=20261007b"></script>
+<script src="github.js?v=20261007c"></script>
+<script src="publish.js?v=20261007c"></script>
 <script>
 const RATING_LABEL={quality:'원료',carb:'탄수화물',additive:'첨가물',value:'가성비'};
 /* evidence 키('ratings.quality','price.p')를 사람이 읽는 이름으로 */
@@ -276,40 +292,39 @@ try{Object.assign(edits,JSON.parse(localStorage.getItem(LS_KEY)||'{}'));}catch{}
 const saveEdits=()=>{try{localStorage.setItem(LS_KEY,JSON.stringify(edits));}catch{}};
 
 const FIELD=[
-  {k:'facts.protein',    label:'조단백 (%)',        type:'num',step:'0.1'},
-  {k:'facts.dmCarb',     label:'건물기준 탄수 (%)',  type:'num',step:'0.1'},
-  {k:'facts.firstIngrCat',label:'1번 원료',          type:'sel',
+  /* ② 성분표 — 라벨지에 한 덩어리로 붙어 있는 값이라 한 줄에 모은다.
+     조단백·건물기준 탄수는 이 값으로 자동 계산된다(publish.js). */
+  {g:'spec', k:'ga.protein',  label:'조단백 (%)',  type:'num',step:'0.1'},
+  {g:'spec', k:'ga.fat',      label:'조지방 (%)',  type:'num',step:'0.1'},
+  {g:'spec', k:'ga.fiber',    label:'조섬유 (%)',  type:'num',step:'0.1'},
+  {g:'spec', k:'ga.moisture', label:'수분 (%)',    type:'num',step:'0.1'},
+  {g:'spec', k:'ga.ash',      label:'조회분 (%)',  type:'num',step:'0.1'},
+  /* 열량은 라벨에만 있다. 급여량('하루 몇 g') 계산이 이 값으로 돌아간다. */
+  {g:'spec', k:'meta.kcalPerKg', label:'열량 (kcal/kg)', type:'num',step:'1'},
+  /* 채점용 원료 값 — 보통은 라벨 읽기가 채운다. 접어 둔다. */
+  {g:'facts', k:'facts.firstIngrCat',label:'1번 원료', type:'sel',
    opts:[['meat','육류'],['fish','어류'],['grain','곡물'],['veg','채소'],['other','기타']]},
-  {k:'facts.cautionN',   label:'주의 성분 (개)',     type:'num',step:'1'},
-  {k:'facts.dangerN',    label:'위험 성분 (개)',     type:'num',step:'1'},
-  {k:'price.p',          label:'가격 (원)',          type:'num',step:'10'},
-  {k:'price.wg',         label:'중량 (g)',           type:'num',step:'1'},
-  /* 가격 기준 용량은 '판매 중인 용량 중 최소' 여야 한다(DATA-POLICY 3.4).
-     확인한 용량을 다 적어야 게이트가 최소값인지 볼 수 있다. */
-  {k:'price.wgOptions',  label:'판매 용량 (g, 쉼표)', type:'text',
-   placeholder:'2000, 6000, 11400'},
-  /* 열량은 라벨에만 있다. 급여량 계산이 이 값으로 돌아간다 — 없으면 상세 화면의
-     '하루 몇 g' 이 안 나온다. 라벨에서 읽은 값을 보여 주고 고칠 수 있게 둔다. */
-  {k:'meta.kcalPerKg',   label:'열량 (kcal/kg)',    type:'num',step:'1'},
-  /* 썸네일. 다나와 사진이 엉뚱한 제품일 때가 있어 직접 넣을 수 있어야 한다. */
-  {k:'meta.thumb',       label:'썸네일 이미지 주소',  type:'text', wide:true,
-   placeholder:'https://… .jpg'},
+  {g:'facts', k:'facts.cautionN', label:'주의 성분 (개)', type:'num',step:'1'},
+  {g:'facts', k:'facts.dangerN',  label:'위험 성분 (개)', type:'num',step:'1'},
+  /* ① 제품 */
+  {g:'prod', k:'meta.thumb', label:'썸네일 이미지 주소', type:'text', wide:true, placeholder:'https://… .jpg'},
   /* 성분 정보가 국내 표시사항인지, 해외 본사(글로벌) 정보인지. 해외면 프론트 상세에
      '※ ○○ 글로벌에서 제시되는 기본 정보로서…' 안내가 붙는다(DATA-POLICY 3.5). */
-  {k:'meta.specOrigin',  label:'성분 정보 기준',     type:'sel',
+  {g:'prod', k:'meta.specOrigin', label:'성분 정보 기준', type:'sel',
    opts:[['domestic','국내 표시사항'],['overseas','해외 본사(글로벌) 정보']]},
-  {k:'meta.specNote',    label:'해외 정보 안내문 (비우면 기본 문구)', type:'text', wide:true,
+  {g:'prod', k:'meta.specNote', label:'해외 정보 안내문 (비우면 기본 문구)', type:'text', wide:true,
    placeholder:'※ ○○ 글로벌에서 제시되는 기본 정보로서, 국내 사료관리법에 따른 제품 표시사항과 일부 다를 수 있습니다.'},
-  /* ── 쿠팡 주소는 두 개다. 쓰임이 달라서 한 칸에 넣으면 안 된다 ──
-     가격 근거 : www.coupang.com/vp/products/1234…  상품 페이지. 어느 상품의
-       얼마인지 확인할 수 있어야 근거가 된다. 게이트가 이 형식을 검사한다.
-     구매 링크 : link.coupang.com/a/…  파트너스 단축링크. 사용자가 누르는 버튼이고
-       이 링크로 들어온 구매에만 수수료가 붙는다. 주소만 봐서는 어느 상품인지
-       알 수 없어 근거로는 쓸 수 없다. */
-  {k:'price.srcUrl',     label:'가격 근거 · 쿠팡 상품 페이지', type:'text', wide:true,
-   placeholder:'https://www.coupang.com/vp/products/6595020969'},
-  {k:'price.buyUrl',     label:'구매 버튼 링크 · 쿠팡 파트너스', type:'text', wide:true,
-   placeholder:'https://link.coupang.com/a/…'}
+  /* ③ 가격. 쿠팡 주소는 두 개다 —
+     구매 버튼 : link.coupang.com/a/…  파트너스 단축링크. 이 링크로 들어온 구매에만 수수료가 붙는다.
+     가격 근거 : www.coupang.com/vp/products/…  상품 페이지. 있으면 좋지만 필수는 아니다(2026-10-07). */
+  {g:'price', k:'price.p',  label:'가격 (원)', type:'num',step:'10'},
+  {g:'price', k:'price.wg', label:'그 가격의 중량 (g)', type:'num',step:'1'},
+  /* 가격 기준 용량은 '판매 중인 용량 중 최소' 여야 한다(DATA-POLICY 3.4). */
+  {g:'price', k:'price.wgOptions', label:'판매 용량 (g, 쉼표)', type:'text', placeholder:'1000, 2000, 3000'},
+  {g:'price', k:'price.buyUrl', label:'구매 버튼 링크 · 쿠팡 파트너스', type:'text', wide:true,
+   placeholder:'https://link.coupang.com/a/…'},
+  {g:'price', k:'price.srcUrl', label:'쿠팡 상품 페이지 (선택)', type:'text', wide:true,
+   placeholder:'https://www.coupang.com/vp/products/… — 없어도 발행됩니다'}
 ];
 
 /* 구매 링크는 숫자가 아니라 따로 다룬다. 쿠팡 파트너스 링크로만 수수료가 붙으므로
@@ -331,7 +346,7 @@ function isEdited(it){
   const e=edits[it.stagingId];
   if(!e)return false;
   return Object.keys(e.facts||{}).length>0||Object.keys(e.price||{}).length>0
-       ||Object.keys(e.meta||{}).length>0||!!e.label||!!e.override;
+       ||Object.keys(e.meta||{}).length>0||Object.keys(e.ga||{}).length>0||!!e.label||!!e.override;
 }
 
 /* ── 라벨을 채운 뒤의 항목 ──
@@ -444,7 +459,8 @@ function sourceBlock(it){
       ${quotes.map(([k,e])=>`<div class="quote"><b>${esc(evLabel(k))}</b>${esc(e.quote)}</div>`).join('')}
     </div>`;
   }).join('') || '<div class="msg f">출처가 없습니다</div>';
-  return cmp+boxes;
+  const n=(it.sources||[]).length;
+  return cmp+`<details class="more"><summary>출처 ${n}곳과 근거 문장 열어 보기</summary><div>${boxes}</div></details>`;
 }
 
 /* ── 제품명 ──
@@ -529,72 +545,77 @@ function urlHint(it){
   if(src&&isShort)rows.push(['f',
     '가격 근거 칸에 <b>파트너스 단축링크</b>가 들어 있습니다. 이 주소만으로는 어느 상품의 얼마인지 확인할 수 없어 근거가 못 됩니다. '+
     '링크를 브라우저에서 열면 <code>www.coupang.com/vp/products/…</code> 로 바뀌는데, 그 주소를 넣어주세요. 지금 주소는 아래 <b>구매 버튼 링크</b> 칸이 맞는 자리입니다.']);
-  else if(src&&!isProduct)rows.push(['f','가격 근거는 쿠팡 상품 페이지(<code>/vp/products/…</code>)여야 합니다.']);
-  else if(src)rows.push(['ok','가격 근거 · 쿠팡 상품 페이지 확인']);
+  else if(src&&!isProduct)rows.push(['w','쿠팡 상품 페이지는 <code>/vp/products/…</code> 주소여야 합니다. 모르면 비워 두세요 — 없어도 발행됩니다.']);
   if(buy&&!buyOk)rows.push(['f','구매 버튼 링크가 쿠팡 도메인이 아닙니다.']);
   else if(!buy)rows.push(['w','구매 버튼 링크가 없습니다 — 이 링크로 들어온 구매에만 수수료가 붙습니다.']);
-  const thumb=m.thumb;
-  return `${rows.map(([k,t])=>`<div class="msg ${k==='ok'?'':k}"${k==='ok'?' style="border-color:#B7E1C4;background:var(--good-soft);color:#166534"':''}>${t}</div>`).join('')}
-    ${thumb?`<div class="thumbprev"><img src="${esc(thumb)}" alt=""
+  return rows.map(([k,t])=>`<div class="msg ${k}">${t}</div>`).join('');
+}
+function thumbPrev(it){
+  const thumb=merged(it).proposed.thumb;
+  return thumb?`<div class="thumbprev"><img src="${esc(thumb)}" alt=""
         onerror="this.closest('.thumbprev').innerHTML='<span class=d>썸네일 주소를 열지 못했습니다 — 주소를 확인해 주세요</span>'">
-      <span class="d">썸네일 미리보기</span></div>`:''}`;
+      <span class="d">썸네일 미리보기</span></div>`:'';
+}
+/* 찾으러 갈 곳 — 다나와(썸네일·판매 용량), 쿠팡(가격·파트너스 링크). 제품명으로 검색한 주소를 바로 건다. */
+function searchQ(it){const m=merged(it).proposed;return encodeURIComponent(`${m.brand||''} ${m.name||''}`.trim());}
+function calcLine(it){
+  const m=merged(it).proposed;
+  const dm=m.facts?.dmCarb;
+  const miss=['protein','fat','fiber','moisture'].filter(k=>m.ga?.[k]==null).map(k=>({protein:'조단백',fat:'조지방',fiber:'조섬유',moisture:'수분'})[k]);
+  return dm!=null
+    ? `건물기준 탄수 <b>${dm}%</b> — 위 값으로 자동 계산돼요`
+    : `건물기준 탄수 <b>계산 불가</b> — ${miss.length?esc(miss.join('·'))+' 칸을 채워 주세요':'값을 확인해 주세요'}`;
 }
 
 /* 값을 고치는 칸. 원본과 달라지면 노란 테두리와 '원래 N' 표시가 붙는다. */
-function editBlock(it){
-  const id=it.stagingId, e=edits[id]||{};
-  const fields=FIELD.map(f=>{
-    const [grp,key]=f.k.split('.');
-    /* meta.* 는 proposed 바로 아래 값이다 (meta.name → proposed.name) */
-    const orig=grp==='meta'?dig(it.proposed,key):dig(it.proposed,f.k);
-    const cur=e[grp]?.[key];
-    const val=cur!==undefined?cur:orig;
-    const changed=cur!==undefined&&cur!==orig;
-    /* 가격 칸을 잠가 뒀었다. 그래서 '가격 대기' 항목은 심사 화면에서 가격을 넣을
-       방법이 아예 없었다 — 영영 가격 대기로 남는다는 뜻이다. 열어 두고,
-       넣은 값이 규칙에 맞는지는 게이트가 판단하게 한다. */
-    const show=val==null?'':Array.isArray(val)?val.join(', '):val;
-    const input=f.type==='sel'
-      ? `<select data-edit="${esc(f.k)}">${f.opts.map(([v,l])=>
-          `<option value="${v}"${v===val?' selected':''}>${l}</option>`).join('')}</select>`
-      : f.type==='text'
-        ? `<input type="text" data-edit="${esc(f.k)}" value="${esc(show)}"
-             placeholder="${esc(f.placeholder||'')}" autocapitalize="off" autocomplete="off" spellcheck="false">`
-        : `<input type="number" step="${f.step}" inputmode="decimal" data-edit="${esc(f.k)}"
-             value="${esc(show)}">`;
-    return `<div class="f${changed?' ch':''}"${f.wide?' style="grid-column:1/-1"':''}>
-      <label>${esc(f.label)}</label>${input}
-      <div class="was">${changed?'원래 '+esc(orig==null?'—':Array.isArray(orig)?orig.join(', '):orig):''}</div>
-    </div>`;
-  }).join('');
+function fieldHtml(it,e,f){
+  const [grp,key]=f.k.split('.');
+  /* meta.* 는 proposed 바로 아래 값이다 (meta.name → proposed.name) */
+  const orig=grp==='meta'?dig(it.proposed,key):dig(it.proposed,f.k);
+  const cur=e[grp]?.[key];
+  /* 성분표 칸은 라벨 읽기를 반영한 값을 보여 준다. 원본만 보여 주면 읽어 놓고도 비어 보인다. */
+  const shown=f.g==='spec'?(grp==='meta'?dig(merged(it).proposed,key):dig(merged(it).proposed,f.k)):orig;
+  const val=cur!==undefined?cur:shown;
+  const changed=cur!==undefined&&cur!==orig;
+  const show=val==null?'':Array.isArray(val)?val.join(', '):val;
+  const input=f.type==='sel'
+    ? `<select data-edit="${esc(f.k)}">${f.opts.map(([v,l])=>
+        `<option value="${v}"${v===val?' selected':''}>${l}</option>`).join('')}</select>`
+    : f.type==='text'
+      ? `<input type="text" data-edit="${esc(f.k)}" value="${esc(show)}"
+           placeholder="${esc(f.placeholder||'')}" autocapitalize="off" autocomplete="off" spellcheck="false">`
+      : `<input type="number" step="${f.step}" inputmode="decimal" data-edit="${esc(f.k)}"
+           value="${esc(show)}">`;
+  return `<div class="f${changed?' ch':''}"${f.wide?' style="grid-column:1/-1"':''}>
+    <label>${esc(f.label)}</label>${input}
+    <div class="was">${changed&&orig!=null?'원래 '+esc(Array.isArray(orig)?orig.join(', '):orig):''}</div>
+  </div>`;
+}
 
+/* 카드 본문 — 위에서 아래로 한 번만 내려가며 끝낼 수 있게 순서를 잡았다.
+   ① 제품(이름·사진·성분 기준) → ② 성분표(라벨 붙여넣기 + 라벨지처럼 한 줄) → ③ 가격 → ④ 출처(접힘).
+   찾으러 가야 하는 곳(다나와·쿠팡)은 제품명으로 검색한 링크를 그 자리에 둔다. */
+function editBlock(it){
+  const e=edits[it.stagingId]||{};
+  const grp=g=>FIELD.filter(f=>f.g===g).map(f=>fieldHtml(it,e,f)).join('');
+  const q=searchQ(it);
   const d=derived(it), o=it.proposed||{};
   const pill=(label,now,before,cls='')=>
     `<span class="p ${cls} ${now!==before?'ch':''}">${esc(label)} ${esc(now??'—')}${
       now!==before?` <s style="opacity:.6">${esc(before??'—')}</s>`:''}</span>`;
-
-  return `<div class="sec">${labelBox(it)}<h3>고치기</h3>
-    <div class="edit">${fields}</div>
-    ${urlHint(it)}
-    ${(() => {
-      /* 조단백은 위 '고치기' 에 이미 칸이 있다. 여기 또 두면 같은 값을 두 번 묻는 꼴이라
-         어느 쪽이 진짜인지 알 수 없다. 위 칸을 그대로 읽어 쓰고, 나머지 셋만 받는다.
-
-         값은 '라벨을 반영한 뒤' 의 ga 로 채운다. 예전엔 원본(다나와) ga 를 읽어서,
-         라벨에서 조지방·조섬유·수분을 다 읽어 놓고도 칸이 비어 있었다.
-         그래서 못 읽은 것처럼 보였다 — 실제로는 읽어서 탄수까지 계산한 상태였다. */
-      const g = merged(it).proposed?.ga || {};
-      const cell = (k, l) => `<div class="f"><label>${l}</label>
-        <input type="number" step="0.1" data-calc="${k}" value="${g[k] == null ? '' : esc(g[k])}"></div>`;
-      return `<div class="calc">
-      <div class="h">조지방·조섬유·수분을 바꾸면 건물기준 탄수를 다시 계산합니다.
-        조단백은 위 칸을 그대로 씁니다. 조회분은 빼지 않습니다.</div>
-      <div class="r">
-        ${cell('fat', '조지방')}${cell('fiber', '조섬유')}${cell('moisture', '수분')}
-        <button data-act="calc">탄수 다시 계산</button>
-      </div>
-    </div>`;
-    })()}
+  return `
+  <section class="blk"><h3>① 제품 <span class="hint">이름 · 사진 · 성분 정보 기준</span></h3>
+    ${nameBox(it)}
+    <div class="edit">${grp('prod')}</div>
+    <div class="links">사진 찾기
+      <a href="https://search.danawa.com/dsearch.php?query=${q}" target="_blank" rel="noopener">다나와에서 검색 ↗</a>
+      <a href="https://www.coupang.com/np/search?q=${q}" target="_blank" rel="noopener">쿠팡에서 검색 ↗</a></div>
+    <div class="thumbslot">${thumbPrev(it)}</div>
+  </section>
+  <section class="blk"><h3>② 성분표 <span class="hint">라벨지처럼 한곳에 — 조단백 · 조지방 · 조섬유 · 수분 · 조회분 · 열량</span></h3>
+    ${labelBox(it)}
+    <div class="edit spec">${grp('spec')}</div>
+    <div class="calcline">${calcLine(it)}</div>
     <div class="derived">
       ${pill('원료',d.ratings.quality,o.ratings?.quality)}
       ${pill('탄수',d.ratings.carb,o.ratings?.carb)}
@@ -604,12 +625,20 @@ function editBlock(it){
              o.price?.pKg!=null?o.price.pKg.toLocaleString('ko-KR')+'원':'—')}
       ${pill('총점',d.score,o.score,'score')}
     </div>
-    <div class="reason">
-      <input data-reason placeholder="왜 고쳤는지 — 근거가 된 문장이나 링크 (발행 명령에 함께 실립니다)"
-        value="${esc(e.reason||'')}">
-    </div>
-    ${isEdited(it)?`<div class="msg w" style="margin-top:9px">⚠ 고친 값은 발행 명령에 함께 실립니다.
-      게이트는 원본이 아니라 고친 값으로 다시 돌아갑니다.</div>`:''}
+    <details class="more"><summary>채점용 원료 값 직접 고치기 — 보통은 라벨 읽기가 채워요</summary>
+      <div class="edit">${grp('facts')}</div></details>
+  </section>
+  <section class="blk"><h3>③ 가격 <span class="hint">쿠팡 · 상품 페이지 주소는 선택</span></h3>
+    <div class="edit">${grp('price')}</div>
+    <div class="links">
+      <a href="https://www.coupang.com/np/search?q=${q}" target="_blank" rel="noopener">쿠팡에서 이 제품 검색 ↗</a>
+      <a href="https://search.danawa.com/dsearch.php?query=${q}" target="_blank" rel="noopener">다나와에서 판매 용량 보기 ↗</a>
+      <a href="https://partners.coupang.com/" target="_blank" rel="noopener">파트너스 링크 만들기 ↗</a></div>
+    <div class="urlhint">${urlHint(it)}</div>
+  </section>
+  <div class="reason" style="margin-top:12px">
+    <input data-reason placeholder="메모 — 왜 고쳤는지, 어디서 확인했는지 (발행 기록에 함께 남습니다)"
+      value="${esc(e.reason||'')}">
   </div>`;
 }
 
@@ -670,7 +699,6 @@ function card(it){
       </div>
     </div>
     <div class="body">
-      ${nameBox(it)}
       <div class="gatemsg">
       ${G.draft?`<div class="msg w"><b>자료 수집 중</b> — 카탈로그에서 기본 정보만 가져온 상태예요.
          아래 <b>라벨 붙여넣기</b>에 라벨을 넣으면 채점이 돌아갑니다.<br>${
@@ -681,9 +709,11 @@ function card(it){
       </div>
       <div class="ovrbox">${overrideBox(it,G)}</div>
       ${g.g3warn.map(w=>`<div class="msg w">⚠ ${esc(w)}</div>`).join('')}
-      ${G.draft?'':`<div class="sec"><h3>대조</h3>${auditTable(it)}</div>`}
-      <div class="sec"><h3>출처와 근거</h3>${sourceBlock(it)}</div>
       ${editBlock(it)}
+      <section class="blk"><h3>④ 출처 · 근거 <span class="hint">필요할 때 열어 보세요</span></h3>
+        ${sourceBlock(it)}
+        ${G.draft?'':`<details class="more"><summary>수집 AI · 심사 AI 대조표 보기</summary>${auditTable(it)}</details>`}
+      </section>
     </div>
     <div class="act">
       <button data-act="reject">반려</button>
@@ -761,7 +791,7 @@ function patchCard(id){
     const orig=grp==='meta'?dig(it.proposed,key):dig(it.proposed,input.dataset.edit);
     const changed=cur!==undefined&&cur!==orig;
     f.classList.toggle('ch',changed);
-    f.querySelector('.was').textContent=changed?'원래 '+(orig??'—'):'';
+    f.querySelector('.was').textContent=changed&&orig!=null?'원래 '+orig:'';
   }
 
   /* 제품명 칸의 안내와 노란 테두리 */
@@ -781,6 +811,10 @@ function patchCard(id){
   const pill=(label,now,before,cls='')=>
     `<span class="p ${cls} ${now!==before?'ch':''}">${esc(label)} ${esc(now??'—')}${
       now!==before?` <s style="opacity:.6">${esc(before??'—')}</s>`:''}</span>`;
+  /* 성분표 아래 탄수 계산 줄 · 가격 안내 · 썸네일 미리보기도 값에 따라 바뀐다 */
+  const cl=el.querySelector('.calcline'); if(cl)cl.innerHTML=calcLine(it);
+  const uh=el.querySelector('.urlhint'); if(uh)uh.innerHTML=urlHint(it);
+  const ts=el.querySelector('.thumbslot'); if(ts&&!ts.contains(document.activeElement))ts.innerHTML=thumbPrev(it);
   el.querySelector('.derived').innerHTML=[
     pill('원료',d.ratings.quality,o.ratings?.quality),
     pill('탄수',d.ratings.carb,o.ratings?.carb),

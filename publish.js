@@ -68,6 +68,19 @@ const PUB = {
     if (!edit) return item;
     const p = JSON.parse(JSON.stringify(item.proposed));
     let sources = item.sources || [], evidence = { ...(item.evidence || {}) };
+    const GA_KO = { protein: '조단백', fat: '조지방', fiber: '조섬유', moisture: '수분', ash: '조회분' };
+
+    /* 심사자가 봉투·라벨·쿠팡을 보고 직접 넣은 값의 출처. 한 번만 만든다.
+       human: true 는 게이트의 생산지 섞임 검사에서 빠진다(DATA-POLICY 3.5.0) —
+       사람이 '이 제품의 값' 이라고 확인한 것이라서다. 근거 인용은 그대로 단다. */
+    let hi = -1;
+    const humanSrc = (title, at) => {
+      if (hi >= 0) return hi;
+      hi = sources.length;
+      sources = [...sources, { role: 'label', human: true, url: sources[0]?.url || '',
+        fetchedAt: at || new Date().toISOString(), title }];
+      return hi;
+    };
 
     /* ── 라벨 판독 ──
        심사자가 라벨을 붙여넣어 원료와 보장성분이 들어왔으면, 막고 있던 이유가
@@ -85,16 +98,11 @@ const PUB = {
       if (L.thumb) p.thumb = L.thumb;
       delete p.draft;
 
-      const i = sources.length;
-      sources = [...sources, {
-        role: 'label', url: L.srcUrl || sources[0]?.url || '',
-        fetchedAt: L.at, title: '제품 라벨 판독 (심사 화면에서 사람이 입력)'
-      }];
-      evidence = { ...evidence };
+      const i = humanSrc('제품 라벨 판독 (심사 화면에서 사람이 입력)', L.at);
+      if (L.srcUrl) sources[i] = { ...sources[i], url: L.srcUrl };
       const q = (k, text) => { evidence[k] = { src: i, quote: text }; };
       /* 라벨에서 읽은 원료·보장성분·열량에도 근거를 단다. 안 달면 게이트가
          '근거 누락: ga.moisture' 처럼 막는다 — 라벨로 새로 채운 칸은 원래 근거가 없다. */
-      const GA_KO = { protein: '조단백', fat: '조지방', fiber: '조섬유', moisture: '수분', ash: '조회분' };
       for (const [k, v] of Object.entries(gaIn)) q(`ga.${k}`, `라벨 보장성분 — ${GA_KO[k] || k} ${v}%`);
       if (L.ingredients?.length) q('ingredients', `라벨 원재료: ${L.ingredients.slice(0, 8).join(', ')}${L.ingredients.length > 8 ? ' …' : ''}`);
       if (L.kcalPerKg != null) q('kcal', `라벨 열량 — ${L.kcalPerKg} kcal/kg`);
@@ -112,14 +120,39 @@ const PUB = {
       if (v == null || String(v).trim() === '') continue;
       p[k] = k === 'kcalPerKg' ? Number(v) : String(v).trim();
     }
+    if (edit.meta?.kcalPerKg != null && String(edit.meta.kcalPerKg).trim() !== '')
+      evidence.kcal = { src: humanSrc('심사 화면에서 대표가 직접 확인·입력'),
+        quote: `열량 ${p.kcalPerKg} kcal/kg (심사자 확인)` };
+
+    /* ── 성분표(보장성분) 직접 입력 ──
+       라벨지처럼 한 칸에 모아 두고 고친다. 고친 칸은 사람 출처로 근거를 단다. */
+    const gaEd = Object.fromEntries(Object.entries(edit.ga || {}).filter(([, v]) => v != null && v !== ''));
+    if (Object.keys(gaEd).length) {
+      p.ga = { ...(p.ga || {}), ...Object.fromEntries(Object.entries(gaEd).map(([k, v]) => [k, Number(v)])) };
+      const h = humanSrc('심사 화면에서 대표가 직접 확인·입력');
+      for (const k of Object.keys(gaEd)) evidence[`ga.${k}`] = { src: h, quote: `${GA_KO[k] || k} ${p.ga[k]}% (심사자 확인)` };
+    }
+
+    /* 사람이 성분표를 직접 채워 원재료·보장성분이 다 갖춰졌으면 '자료 수집 중' 을 푼다.
+       라벨을 붙여넣지 않고 칸에 바로 넣어도 심사로 넘어가게. 나머지는 게이트가 판단한다. */
+    if (p.draft && (L || Object.keys(gaEd).length || edit.meta) && p.ingredients?.length
+        && ['protein', 'fat', 'fiber', 'moisture'].every(k => p.ga?.[k] != null)) delete p.draft;
 
     Object.assign(p.facts ??= {}, edit.facts || {});
+    /* 조단백·건물기준 탄수는 보장성분에서 나오는 값이다. 따로 적게 두면 둘이 어긋나
+       'ga.protein 과 facts.protein 이 다릅니다' 로 막혔다. 보장성분이 바뀌었으면 여기서 맞춘다. */
+    if (L || Object.keys(gaEd).length) {
+      if (p.ga?.protein != null) p.facts.protein = Number(p.ga.protein);
+      p.facts.dmCarb = ENGINE.computeDmCarb(p.ga || {});
+      const h = hi >= 0 ? hi : humanSrc('심사 화면에서 대표가 직접 확인·입력');
+      evidence['facts.protein'] = { src: h, quote: `보장성분 조단백 ${p.ga?.protein}%` };
+      evidence['facts.dmCarb'] = { src: h,
+        quote: `조단백 ${p.ga?.protein} / 조지방 ${p.ga?.fat} / 조섬유 ${p.ga?.fiber} / 수분 ${p.ga?.moisture} → 건물기준 탄수 ${p.facts.dmCarb ?? '계산 불가(빈 칸 있음)'}%` };
+    }
     /* 화면의 '주의성분 N종' 은 warnN 이다. 라벨로 원료가 바뀌면 주의·위험 수도 바뀌는데
        warnN 을 그대로 두면 게이트가 'warnN 이 사실값과 다릅니다' 로 막는다.
        사람이 쓰는 칸이 아니라 facts 에서 나오는 값이라 여기서 다시 맞춘다. */
     if (p.facts.cautionN != null) p.warnN = p.facts.cautionN + (p.facts.dangerN ?? 0);
-    if (L) evidence['facts.dmCarb'] = { src: sources.length - 1,
-      quote: `조단백 ${L.ga.protein} / 조지방 ${L.ga.fat} / 조섬유 ${L.ga.fiber} / 수분 ${L.ga.moisture} → 건물기준 탄수 ${p.facts.dmCarb}%` };
 
     /* 가격이 들어왔으면 보류를 푼다. 가격이 없으면 pricePending 을 유지해야 한다 —
        게이트가 'pricePending 인데 price 가 있다' 로 탈락시킨다. */
@@ -141,8 +174,10 @@ const PUB = {
                                  title: '쿠팡 상품 페이지 (가격 근거)' }];
       }
       const ri = sources.findIndex(s => s.role === 'retail' && s.url === url);
-      if (ri >= 0) evidence['price.p'] = { src: ri,
-        quote: `쿠팡 ${p.price.wg}g ${Number(p.price.p).toLocaleString('ko-KR')}원 (심사 화면에서 사람이 확인)` };
+      const pq = `쿠팡 ${p.price.wg}g ${Number(p.price.p).toLocaleString('ko-KR')}원 (심사 화면에서 사람이 확인)`;
+      if (ri >= 0) evidence['price.p'] = { src: ri, quote: pq };
+      /* 상품 페이지 주소는 필수가 아니다(2026-10-07). 없으면 사람 출처에 근거를 단다. */
+      else if (priceIn.p > 0) evidence['price.p'] = { src: humanSrc('심사 화면에서 대표가 직접 확인·입력'), quote: pq + ' · 상품 페이지 주소 없음' };
     }
 
     const pending = p.pricePending === true;
