@@ -151,8 +151,18 @@ const PUB = {
     const gaEd = Object.fromEntries(Object.entries(edit.ga || {}).filter(([, v]) => v != null && v !== ''));
     if (Object.keys(gaEd).length) {
       p.ga = { ...(p.ga || {}), ...Object.fromEntries(Object.entries(gaEd).map(([k, v]) => [k, Number(v)])) };
-      const h = humanSrc('심사 화면에서 대표가 직접 확인·입력');
-      for (const k of Object.keys(gaEd)) evidence[`ga.${k}`] = { src: h, quote: `${GA_KO[k] || k} ${p.ga[k]}% (심사자 확인)` };
+      /* '다나와 값으로 채우기' 로 들어온 칸은 출처를 따로 단다 — 어디서 본 숫자인지 남아야 나중에 고칠 수 있다. */
+      const dnKeys = new Set((edit.gaDn?.keys || []).filter(k => k in gaEd));
+      let dsi = -1;
+      if (dnKeys.size) {
+        dsi = sources.length;
+        sources = [...sources, { role: 'label', human: true, url: edit.gaDn.url || '',
+          fetchedAt: edit.gaDn.at || new Date().toISOString(), title: '다나와 국내 영양정보 (심사 화면에서 대표가 확인)' }];
+      }
+      const h = Object.keys(gaEd).some(k => !dnKeys.has(k)) ? humanSrc('심사 화면에서 대표가 직접 확인·입력') : -1;
+      for (const k of Object.keys(gaEd)) evidence[`ga.${k}`] = dnKeys.has(k)
+        ? { src: dsi, quote: `다나와 국내 영양정보 — ${GA_KO[k] || k} ${p.ga[k]}% (대표 확인)` }
+        : { src: h, quote: `${GA_KO[k] || k} ${p.ga[k]}% (심사자 확인)` };
     }
 
     /* 사람이 성분표를 직접 채워 원재료·보장성분이 다 갖춰졌으면 '자료 수집 중' 을 푼다.

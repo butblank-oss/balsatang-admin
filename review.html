@@ -297,6 +297,21 @@ tr.diff td:first-child{color:var(--bad);font-weight:600}
    제목·토큰 버튼·이동 링크가 껍데기에 이미 있어 두 벌로 보였다. 토큰은 같은 도메인
    같은 열쇠라 껍데기에서 한 번 넣으면 여기서도 그대로 쓴다. */
 .embedded .top{display:none}
+.notebox{margin:0 0 12px;padding:12px 14px;border-radius:10px;background:#FFF8EC;border:1px solid #F2D49B;display:flex;flex-direction:column;gap:6px}
+.notebox div{display:flex;gap:10px;font-size:12.5px;line-height:1.6}
+.notebox b{flex:none;width:58px;color:#8A5A14;font-weight:700}
+.notebox span{flex:1;min-width:0;color:#4E5968;word-break:keep-all}
+.dnbox{margin:10px 0 12px;padding:12px 14px;border-radius:10px;background:#F5F8FE;border:1px solid #D9E4FB}
+.dnbox .dnh{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px}
+.dnbox .dnh a{font-size:12px;color:#1F57C8;font-weight:600;text-decoration:none}
+.dnbox .dnv{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.dnbox .dnv span{font-size:12px;padding:3px 8px;border-radius:6px;background:#fff;border:1px solid #E4E7EC;color:#4E5968}
+.dnbox .dnv span.miss{border-color:#2F6FED;color:#1F57C8;font-weight:700}
+.dnbox .dnv span.used{background:#EEF8F1;border-color:#B7E1C4;color:#0F6B4E}
+.dnbox [data-act="dnfill"]{margin-top:10px;width:100%;height:38px;border-radius:8px;border:0;background:#2F6FED;color:#fff;
+  font-size:13px;font-weight:700;cursor:pointer}
+.dnbox .dnok{margin-top:8px;font-size:12px;color:#0F6B4E;font-weight:600}
+.dnbox .dnwarn{margin-top:8px;font-size:12px;color:#B45309;line-height:1.5}
 </style>
 </head>
 <body>
@@ -341,7 +356,7 @@ document.write(['engine/dict.js', 'engine/phrases.js', 'engine/engine.js',
   .map(function (f) { return '<scr' + 'ipt src="' + window.APP_BASE + f + '"><\/scr' + 'ipt>'; }).join(''));
 </script>
 <script src="github.js?v=20261008b"></script>
-<script src="publish.js?v=20261008a"></script>
+<script src="publish.js?v=20261008xa"></script>
 <script>
 const TYPE_KO={dry:'건식',wet:'습식',air_dried:'에어드라이',freeze_dried:'동결건조',raw:'화식'};
 const RATING_LABEL={quality:'원료',carb:'탄수화물',additive:'첨가물',value:'가성비'};
@@ -572,6 +587,35 @@ function nameBox(it){
    칸을 마흔 개 만드는 대신 라벨을 통째로 받는다. 원료 표기·보장성분·열량·
    썸네일·구매 링크를 한 번에 갈라낸다. 갈라낸 결과를 그대로 보여 주고,
    사람이 확인한 뒤에야 값에 반영된다 — 조용히 집어넣지 않는다. */
+/* 다나와 국내 영양정보 — 공식 페이지에 빠진 칸만 채운다(대표 결정 2026-10-08).
+   눌러서 채운 칸은 근거에 '다나와 국내 영양정보를 대표가 확인' 으로 남는다. 공식 값과 다르면 알린다. */
+const GA_KO_R={protein:'조단백',fat:'조지방',fiber:'조섬유',moisture:'수분',ash:'조회분'};
+/* 조사 메모 — 조사원이 남긴 특이사항, 가격·용량 할 일. 예전엔 저장소에만 있고 화면에 안 나왔다
+   (커클랜드 '페이지끼리 성분 숫자가 다름' 같은 경고가 묻혔다). */
+function noteBox(it){
+  const t=it.priceTodo||{};
+  const lines=[it.note&&['조사 메모',it.note],t.메모&&['할 일',t.메모],t.다나와용량&&['판매 용량',t.다나와용량]].filter(Boolean);
+  if(!lines.length)return '';
+  return `<div class="notebox">${lines.map(([k,v])=>`<div><b>${esc(k)}</b><span>${esc(v)}</span></div>`).join('')}</div>`;
+}
+function danawaBox(it){
+  const dn=it.danawaRef; if(!dn||!dn.ga)return '';
+  const ga=merged(it).proposed.ga||{};
+  const keys=Object.keys(GA_KO_R).filter(k=>dn.ga[k]!=null);
+  if(!keys.length)return '';
+  const miss=keys.filter(k=>ga[k]==null);
+  const diff=keys.filter(k=>ga[k]!=null&&Number(ga[k])!==Number(dn.ga[k]));
+  const used=new Set(edits[it.stagingId]?.gaDn?.keys||[]);
+  return `<div class="dnbox">
+    <div class="dnh"><b>다나와 국내 영양정보</b>
+      <a href="${esc(dn.url)}" target="_blank" rel="noopener">다나와에서 보기 ↗</a></div>
+    <div class="dnv">${keys.map(k=>`<span class="${miss.includes(k)?'miss':used.has(k)?'used':''}">${GA_KO_R[k]} ${dn.ga[k]}%</span>`).join('')}</div>
+    ${miss.length?`<button class="alt" data-act="dnfill">빈 칸 ${miss.length}개 다나와 값으로 채우기 · ${miss.map(k=>GA_KO_R[k]+' '+dn.ga[k]+'%').join(', ')}</button>`
+      :used.size?`<div class="dnok">✓ ${[...used].map(k=>GA_KO_R[k]).join('·')}을(를) 다나와 값으로 채웠어요</div>`:''}
+    ${diff.length?`<div class="dnwarn">⚠ 공식 값과 다름 — ${diff.map(k=>`${GA_KO_R[k]} 공식 ${ga[k]} / 다나와 ${dn.ga[k]}`).join(' · ')}. 라벨로 확인해 주세요.</div>`:''}
+  </div>`;
+}
+
 function labelBox(it){
   const L=edits[it.stagingId]?.label;
   const done=!!L;
@@ -694,6 +738,7 @@ function editBlock(it){
     `<span class="p ${cls} ${now!==before?'ch':''}">${esc(label)} ${esc(now??'—')}${
       now!==before?` <s style="opacity:.6">${esc(before??'—')}</s>`:''}</span>`;
   return `
+  ${noteBox(it)}
   <section class="blk"><h3>① 제품 <span class="hint">이름 · 사진 · 성분 정보 기준</span></h3>
     ${nameBox(it)}
     <div class="edit">${grp('prod')}</div>
@@ -704,6 +749,7 @@ function editBlock(it){
   </section>
   <section class="blk"><h3>② 성분표 <span class="hint">라벨지처럼 한곳에 — 조단백 · 조지방 · 조섬유 · 수분 · 조회분 · 열량</span></h3>
     ${labelBox(it)}
+    ${danawaBox(it)}
     <div class="edit spec">${grp('spec')}</div>
     <div class="calcline">${calcLine(it)}</div>
     <div class="derived">
@@ -1269,6 +1315,19 @@ function readLabel(card){
 document.addEventListener('click',e=>{
   const rl=e.target.closest('[data-act="readlabel"]');
   if(rl){readLabel(rl.closest('.card'));return;}
+  const dnf=e.target.closest('[data-act="dnfill"]');
+  if(dnf){
+    const id=dnf.closest('.card').dataset.id, it=itemById(id), dn=it?.danawaRef;
+    if(!dn)return;
+    const ga=merged(it).proposed.ga||{};
+    const miss=Object.keys(GA_KO_R).filter(k=>dn.ga?.[k]!=null&&ga[k]==null);
+    const E=edits[id]||(edits[id]={});
+    E.ga=E.ga||{};
+    for(const k of miss)E.ga[k]=dn.ga[k];
+    E.gaDn={url:dn.url,keys:[...new Set([...(E.gaDn?.keys||[]),...miss])],at:new Date().toISOString()};
+    saveEdits();render();toast(`다나와 값으로 ${miss.length}칸 채웠어요 — 근거에 '다나와 국내 영양정보(대표 확인)' 로 남아요`);
+    return;
+  }
   /* 이 사료에 대해 이 브라우저에 남은 고친 값(라벨·성분·가격·이름)을 전부 지운다.
      같은 사료를 다시 수집하면 예전 고친 값이 새 자료와 어긋난 채 남을 수 있어서다. */
   const rs=e.target.closest('[data-act="resetedits"]');
