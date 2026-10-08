@@ -179,6 +179,13 @@ const PUB = {
     /* 가격이 들어왔으면 보류를 푼다. 가격이 없으면 pricePending 을 유지해야 한다 —
        게이트가 'pricePending 인데 price 가 있다' 로 탈락시킨다. */
     const priceIn = { ...(edit.price || {}) };
+    /* 다나와에서 미리 모은 판매 용량(wgOptionsHint) — 심사자가 따로 안 적었으면 그 값을 쓴다.
+       가격 중량도 비어 있으면 그중 최소 용량으로 본다(DATA-POLICY 3.4: 가격은 최소 용량 기준). */
+    const hint = (p.wgOptionsHint || []).filter(n => n > 0);
+    if (hint.length) {
+      if (priceIn.wgOptions === undefined) priceIn.wgOptions = [...new Set(hint)].sort((a, b) => a - b);
+      if (priceIn.p > 0 && !(priceIn.wg > 0)) priceIn.wg = Math.min(...priceIn.wgOptions);
+    }
     const buyUrl = priceIn.buyUrl;
     const srcUrl = priceIn.srcUrl;
     delete priceIn.buyUrl; delete priceIn.srcUrl;
