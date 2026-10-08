@@ -100,7 +100,7 @@ const EVENT_KO = {
   feeding_meals: '끼니 수', feeding_bag: '봉지 용량', pet_edit: '아이 정보 수정', wizard_answer: '맞춤 답변',
   wizard_submit: '맞춤 제출', pet_profile_saved: '맞춤 완료', article_click: '글 열기', article_category: '글 분류',
   nav: '화면 이동', food_click: '사료 카드', search_clear: '검색 지우기', back: '뒤로', js_error: '오류',
-  tracking_on: '기록 켬', tracking_off: '기록 끔'
+  tracking_on: '기록 켬', tracking_off: '기록 끔', leave: '화면 떠남'
 };
 /* app.js 가 이 파일보다 늦게 읽히므로 부를 때 찾는다 */
 const CONCERN_SHORT = { skin: '피부', eye_tear: '눈물자국', digestive: '소화', weight: '체중', joint: '관절',
@@ -117,7 +117,7 @@ const screenName = s => SCREEN_KO[s] || s || '(알 수 없음)';
    한 화면에 표 열여섯 개를 쌓았더니 무엇을 봐야 할지 몰랐다. 질문 단위로 나눈다.
    대시보드(요즘 어때?) · 유입(어디서 왔어? 사람이야?) · 세션(한 사람은 뭘 했어?)
    · 사료·검색(뭘 찾았어?) · 행동·오류(어디서 막혔어?) */
-const TABS = [['dash', '대시보드'], ['traffic', '유입 · 사람/봇'], ['sessions', '세션별'], ['gsc', '검색어 (구글)'], ['foods', '사료 · 검색'], ['acts', '행동 · 오류']];
+const TABS = [['dash', '대시보드'], ['traffic', '유입 · 사람/봇'], ['journey', '여정 · 이탈'], ['sessions', '세션별'], ['gsc', '검색어 (구글)'], ['foods', '사료 · 검색'], ['acts', '행동 · 오류']];
 const WHO = [['human', '사람만'], ['bot', '봇만'], ['all', '전체']];
 const KIND_KO = { search: '검색 (구글·네이버 등)', video: '유튜브', community: '블로그·카페', social: 'SNS', ai: 'AI 답변',
   messenger: '카카오톡 등 메신저', naver_app: '네이버 앱', shop: '쇼핑몰', referral: '다른 사이트', direct: '직접 방문' };
@@ -238,6 +238,9 @@ async function page() {
       last = d;
       body.innerHTML = t ? viewTraffic(t, d) : viewTrafficOld(d);
       if (t) wireStack(t);
+    } else if (st.tab === 'journey') {
+      try { body.innerHTML = viewJourney(await journey(from, to, st.who)); }
+      catch (e) { if (!missingFn(e)) throw e; needSql = true; body.innerHTML = '<div class="card"><div class="empty">여정·이탈 분석은 DB 업데이트 뒤에 열려요</div></div>'; }
     } else if (st.tab === 'sessions') {
       st.sess = []; st.sessTotal = 0;
       try { await moreSessions(from, to); body.innerHTML = viewSessions(); wireSessions(); }
@@ -248,7 +251,7 @@ async function page() {
       body.innerHTML = st.tab === 'foods' ? viewFoods(d) : st.tab === 'acts' ? viewActs(d, r) : viewDash(d);
       if (st.tab === 'dash') wireChart(d);
     }
-    if (needSql) sqlBanner('사람·봇 구분, 유입 종류, 세션별 보기를 쓰려면 새 DB 함수가 있어야 해요. 지금 숫자에는 봇이 섞여 있어요.');
+    if (needSql) sqlBanner(st.tab === 'journey' ? '여정·이탈 분석(analytics_journey)을 쓰려면 새 DB 함수가 있어야 해요.' : '사람·봇 구분, 유입 종류, 세션별 보기를 쓰려면 새 DB 함수가 있어야 해요. 지금 숫자에는 봇이 섞여 있어요.');
   } catch (e) {
     if (e.auth) { openLogin(e.message); return; }
     el('anBody').innerHTML = `<div class="card"><div class="empty" style="color:#B91C1C">${$esc(e.message)}</div></div>`;
@@ -700,6 +703,134 @@ async function viewGsc(body) {
   if (sel) sel.onchange = () => { ls.set(GSC_SITE, sel.value); page(); };
 }
 
+/* ── 여정 · 이탈 ──
+   한 방문이 어떤 길로 다니다 어디서 왜 떠났는지. 이유는 기록으로 '추정' 한 것이다 —
+   규칙은 schema.sql 7번(analytics_journey)에 있다. 화면에는 할 일과 함께 보여준다. */
+const journey = (from, to, who) => api('/rest/v1/rpc/analytics_journey', { method: 'POST', body: JSON.stringify({ p_from: from, p_to: to, p_who: who }) });
+const REASON = {
+  bought:      ['구매 클릭 후 떠남', 'var(--good)', '목표 달성이에요.'],
+  long_read:   ['오래 둘러보고 떠남 (2분 이상)', 'var(--pri)', '정보를 얻고 간 방문이에요. 찜·비교로 다시 오게 할 거리를 보세요.'],
+  detail_exit: ['사료를 보고 구매 없이 떠남', 'var(--ink3, #8B95A1)', '가격이나 판정이 기대와 달랐을 수 있어요. 아래 사료별 표를 보세요.'],
+  nolink:      ['구매 링크 없는 사료를 보고 떠남', 'var(--bad)', '살 방법이 없어서 떠났을 가능성이 커요 — 구매 링크를 채우세요.'],
+  zero_search: ['검색 결과가 없어 떠남', 'var(--bad)', '찾는 사료가 없었어요 — 아래 검색어를 사료·동의어 추가 후보로.'],
+  search_exit: ['검색 결과를 보고 떠남', 'var(--warn)', '결과는 있었지만 누르지 않았어요. 검색어와 결과가 맞는지 보세요.'],
+  wizard_drop: ['맞춤 추천 입력 중 떠남', 'var(--warn)', '질문이 길거나 어려웠을 수 있어요.'],
+  error:       ['화면 오류를 겪고 떠남', 'var(--bad)', '행동·오류 탭에서 오류를 확인하세요.'],
+  bounce:      ['들어오자마자 떠남 (10초 안)', 'var(--warn)', '첫 화면이 기대와 달랐을 가능성. 흔한 여정에서 어디로 들어왔는지 보세요.'],
+  browse:      ['둘러보다 떠남', 'var(--muted)', '']
+};
+const hasLink = id => {
+  const f = ((typeof store !== 'undefined' && store.foods) || []).find(x => x.id === id);
+  return !!(f?.price?.buyUrl || (typeof DETAIL !== 'undefined' && (DETAIL[id]?.prices || []).some(p => p.url)));
+};
+/* 검색 목적 — 검색어 글자로 가른다. 사료 이름·브랜드가 먼저(그 사료를 찾으러 온 것). */
+const INTENT = [
+  ['고민', /눈물|관절|피부|알러지|알레르기|다이어트|체중|비만|소화|설사|묽은|변비|구토|장 |노령|노견|시니어|퍼피|자견|어린|신장|간 |처방|심장|치석|구취|모질|털빠짐|입맛|편식|기침|요로|결석/],
+  ['원료·성분', /연어|닭|오리|양고기|소고기|칠면조|생선|곡물|그레인|grain|단백질|탄수|지방|첨가물|보존제|원료|성분|유기농|휴먼|가수분해|단일/i],
+  ['가격', /가성비|가격|저렴|싼|최저|할인|대용량|싸게|얼마/],
+];
+function intentOf(q) {
+  const s = String(q || '').toLowerCase();
+  const foods = (typeof store !== 'undefined' && store.foods) || [];
+  if (foods.some(f => (f.brand && s.includes(String(f.brand).toLowerCase())) || (f.name && String(f.name).length >= 3 && s.includes(String(f.name).toLowerCase()))))
+    return '특정 사료·브랜드';
+  const hit = INTENT.find(([, re]) => re.test(s + ' '));
+  return hit ? hit[0] : '기타';
+}
+const OUTCOME_KO = { detail: '사료 상세로 감', left: '그대로 떠남', other: '다른 화면으로' };
+const stepName = s => screenName(s);
+const articleTitle = id => (((typeof store !== 'undefined' && store.articles) || []).find(a => a.id === id) || {}).title || id;
+
+function viewJourney(j) {
+  const total = j.total || 0;
+  /* 사료 보고 떠남을 링크 유무로 나눈다 — 링크 정보는 DB 가 아니라 어드민이 안다. */
+  const rs = {};
+  const foodExit = {};
+  for (const r of j.reasons || []) {
+    let k = r.reason;
+    if (k === 'detail_exit') {
+      k = r.food && !hasLink(r.food) ? 'nolink' : 'detail_exit';
+      if (r.food) { const o = foodExit[r.food] || (foodExit[r.food] = { id: r.food, n: 0, link: hasLink(r.food) }); o.n += r.sessions; }
+    }
+    const o = rs[k] || (rs[k] = { k, n: 0, sec: 0 });
+    o.sec = (o.sec * o.n + (r.avg_sec || 0) * r.sessions) / (o.n + r.sessions || 1); o.n += r.sessions;
+  }
+  const reasons = Object.values(rs).sort((a, b) => b.n - a.n);
+  const n = k => rs[k]?.n || 0;
+  const trouble = n('zero_search') + n('nolink') + n('error') + n('wizard_drop');
+  const intents = {};
+  for (const s of j.searches || []) {
+    const k = intentOf(s.q);
+    const o = intents[k] || (intents[k] = { k, n: 0, detail: 0 });
+    o.n += s.times; if (s.outcome === 'detail') o.detail += s.times;
+  }
+  const exits = (j.exits || []).filter(x => x.screen).map(x => ({ ...x, rate: x.sessions ? (x.exits - x.exits_bought) / x.sessions : 0 }));
+  const secTxt = v => v == null ? '—' : v < 60 ? Math.round(v) + '초' : Math.floor(v / 60) + '분 ' + Math.round(v % 60) + '초';
+
+  return `
+  ${j.leaveOn ? '' : `<div style="margin:-4px 0 12px;font-size:11.5px;color:var(--muted)">마지막 화면에 머문 시간은 오늘 배포분부터 쌓여요. 그 전 기록은 '바로 나감' 이 실제보다 많게 잡힐 수 있어요.</div>`}
+  <div class="kpis an-kpis">
+    <div class="kpi"><div class="kpi-l">${ico('refresh', 14)}분석한 방문</div><div class="kpi-v">${num(total)}</div><div class="kpi-s">${st.who === 'human' ? '사람만' : st.who === 'bot' ? '봇만' : '전체'}</div></div>
+    <div class="kpi ok"><div class="kpi-l">${ico('coins', 14)}구매 클릭으로 끝남</div><div class="kpi-v">${pct(n('bought'), total)}</div><div class="kpi-s">${num(n('bought'))}회</div></div>
+    <div class="kpi"><div class="kpi-l">${ico('eye', 14)}10초 안에 나감</div><div class="kpi-v">${pct(n('bounce'), total)}</div><div class="kpi-s">${num(n('bounce'))}회</div></div>
+    <div class="kpi alert"><div class="kpi-l">${ico('chart', 14)}막혀서 떠남</div><div class="kpi-v">${pct(trouble, total)}</div><div class="kpi-s">검색 0건·링크 없음·오류·맞춤 중단</div></div>
+  </div>
+
+  ${sec('왜 떠났을까' + hint('— 기록으로 추정한 이유 · 마지막 행동 기준'), reasons.length ? reasons.map(r => {
+    const [label, color, todo] = REASON[r.k] || [r.k, 'var(--muted)', ''];
+    const w = total ? r.n / total * 100 : 0;
+    return `<div style="padding:9px 0;border-bottom:1px solid var(--line)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="width:8px;height:8px;border-radius:50%;background:${color};flex:none"></span>
+        <b style="font-size:12.5px;flex:1">${label}</b>
+        <span style="font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums">${num(r.n)}회 · ${pct(r.n, total)} · 평균 ${secTxt(r.sec)}</span></div>
+      <div style="margin:6px 0 0 18px;height:6px;background:var(--panel2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${w}%;background:${color}"></div></div>
+      ${todo ? `<div style="margin:5px 0 0 18px;font-size:11.5px;color:var(--muted)">${todo}</div>` : ''}</div>`;
+  }).join('') : '<div class="empty" style="padding:28px">아직 기록이 없어요</div>')}
+
+  ${sec('흔한 여정' + hint('— 들어온 곳 › 본 화면 순서 (앞 5개) · 많은 순'), (j.paths || []).length ? (j.paths || []).map(p => `
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);flex-wrap:wrap">
+      <div style="flex:1;min-width:260px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;font-size:12px">
+        <span class="tag info">${$esc(kindName(p.kind))}</span>
+        ${(p.path || []).map(s => `<span style="color:var(--muted)">›</span><span class="tag mute">${$esc(stepName(s))}</span>`).join('')}
+        ${p.more ? '<span style="color:var(--muted)">› …</span>' : ''}
+</div>
+      <span style="font-size:12px;color:var(--sub);white-space:nowrap;font-variant-numeric:tabular-nums">${num(p.sessions)}회 · 구매 ${pct(p.bought, p.sessions)} · 평균 ${secTxt(p.avg_sec)}</span>
+    </div>`).join('') : '<div class="empty" style="padding:28px">아직 기록이 없어요</div>')}
+
+  <div class="grid2 an2">
+    ${sec('어디서 떠나나' + hint('— 그 화면을 본 방문 중 거기서 끝난 비율 (구매 후 떠남 제외)'), table([
+      { h: '화면', f: r => screenName(r.screen) }, { h: '본 방문', r: 1, f: r => num(r.sessions) },
+      { h: '여기서 끝', r: 1, f: r => num(r.exits) },
+      { h: '이탈률', r: 1, f: r => `<span style="${r.rate >= .5 ? 'color:#B91C1C;font-weight:700' : ''}">${Math.round(r.rate * 100)}%</span>` }], exits))}
+    ${sec('보고 떠난 사료' + hint('— 상세에서 구매 없이 끝난 방문'), table([
+      { h: '사료', f: r => `<div class="t-main">${$esc(foodName(r.id))}</div>` },
+      { h: '떠남', r: 1, f: r => num(r.n) },
+      { h: '구매 링크', f: r => r.link ? '<span class="tag good">있음</span>' : '<span class="tag bad">없음</span>' }],
+      Object.values(foodExit).sort((a, b) => b.n - a.n).slice(0, 15), '사료 화면에서 끝난 방문이 없어요'))}
+  </div>
+
+  <div class="grid2 an2">
+    ${sec('왜 검색했나' + hint('— 검색어로 가른 목적 · 상세로 이어진 비율'), Object.keys(intents).length
+      ? bars(Object.values(intents).sort((a, b) => b.n - a.n), 'n', r => $esc(r.k), r => `${num(r.n)}회 · 상세로 ${pct(r.detail, r.n)}`)
+      : '<div class="empty" style="padding:28px">검색 기록이 없어요</div>')}
+    ${sec('많이 읽은 글', table([
+      { h: '글', f: r => `<div class="t-main">${$esc(articleTitle(r.id))}</div>` }, { h: '조회', r: 1, f: r => num(r.views) },
+      { h: '방문', r: 1, f: r => num(r.sessions) }], j.articles || [], '글을 읽은 기록이 없어요'))}
+  </div>
+
+  ${sec('검색어별 흐름' + hint('— 어디서 검색했고, 검색 뒤 어떻게 됐나'), table([
+    { h: '검색어', f: r => `<b>${$esc(r.q)}</b>` }, { h: '목적', f: r => `<span class="tag mute">${$esc(intentOf(r.q))}</span>` },
+    { h: '검색한 곳', f: r => $esc(r.src === '(바로 검색)' ? r.src : screenName(r.src)) },
+    { h: '결과', r: 1, f: r => r.n === 0 ? '<span class="tag bad">0건</span>' : num(r.n) },
+    { h: '그 뒤', f: r => r.outcome === 'left' ? '<span class="tag warn">그대로 떠남</span>' : $esc(OUTCOME_KO[r.outcome] || r.outcome) },
+    { h: '횟수', r: 1, f: r => num(r.times) }], (j.searches || []).slice(0, 60), '검색 기록이 없어요'))}
+
+  <div style="font-size:11.5px;color:var(--muted);line-height:1.7;margin:4px 2px 0">
+    이유는 마지막 행동으로 추정한 거예요 (예: 결과 0건 검색 뒤 사료를 안 열고 끝났으면 '검색 결과가 없어 떠남').
+    한 방문의 실제 순서는 <a href="#" onclick="ANALYTICS.tab('sessions');return false" style="color:var(--pri-ink);font-weight:700">세션별</a> 탭에서 볼 수 있어요.</div>`;
+}
+
 function cohortCell(r, n) {
   const v = r['w' + n];
   const wkEnd = new Date(r.wk).getTime() + (n + 1) * 7 * 86400e3;
@@ -713,6 +844,7 @@ function describe(r) {
   const p = r.props || {};
   if (r.name === 'screen_view') return screenName(p.screen) + (p.id ? ' · ' + foodName(p.id) : '') + (p.q ? ` · "${p.q}"` : '');
   if (r.name === 'search') return `"${p.q}" → ${p.n}건`;
+  if (r.name === 'leave') return `${screenName(p.screen)} · ${Math.round((p.ms || 0) / 1000)}초 머물고 떠남`;
   if (r.name === 'session_start' || r.name === 'first_visit') return [r.utm_source || r.ref || '직접', r.device, r.browser].filter(Boolean).join(' · ');
   if (p.id) return foodName(p.id) + (p.at ? ` · ${p.at}` : '');
   const rest = Object.entries(p).filter(([k]) => k !== 'screen').map(([k, v]) => `${k}=${Array.isArray(v) ? v.join(',') : v}`);
