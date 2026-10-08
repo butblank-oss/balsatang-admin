@@ -100,7 +100,7 @@ const EVENT_KO = {
   feeding_meals: '끼니 수', feeding_bag: '봉지 용량', pet_edit: '아이 정보 수정', wizard_answer: '맞춤 답변',
   wizard_submit: '맞춤 제출', pet_profile_saved: '맞춤 완료', article_click: '글 열기', article_category: '글 분류',
   nav: '화면 이동', food_click: '사료 카드', search_clear: '검색 지우기', back: '뒤로', js_error: '오류',
-  tracking_on: '기록 켬', tracking_off: '기록 끔', leave: '화면 떠남'
+  tracking_on: '기록 켬', tracking_off: '기록 끔', leave: '화면 떠남', owner_mark: '내 방문 표시'
 };
 /* app.js 가 이 파일보다 늦게 읽히므로 부를 때 찾는다 */
 const CONCERN_SHORT = { skin: '피부', eye_tear: '눈물자국', digestive: '소화', weight: '체중', joint: '관절',
@@ -118,9 +118,9 @@ const screenName = s => SCREEN_KO[s] || s || '(알 수 없음)';
    대시보드(요즘 어때?) · 유입(어디서 왔어? 사람이야?) · 세션(한 사람은 뭘 했어?)
    · 사료·검색(뭘 찾았어?) · 행동·오류(어디서 막혔어?) */
 const TABS = [['dash', '대시보드'], ['traffic', '유입 · 사람/봇'], ['journey', '여정 · 이탈'], ['sessions', '세션별'], ['gsc', '검색어 (구글)'], ['foods', '사료 · 검색'], ['acts', '행동 · 오류']];
-const WHO = [['human', '사람만'], ['bot', '봇만'], ['all', '전체']];
-const KIND_KO = { search: '검색 (구글·네이버 등)', video: '유튜브', community: '블로그·카페', social: 'SNS', ai: 'AI 답변',
-  messenger: '카카오톡 등 메신저', naver_app: '네이버 앱', shop: '쇼핑몰', referral: '다른 사이트', direct: '직접 방문' };
+const WHO = [['human', '사람만'], ['bot', '봇만'], ['owner', '내 방문'], ['all', '전체']];
+const KIND_KO = { search: '검색 (구글·네이버 등)', video: '유튜브', community: '블로그·카페·밴드', social: 'SNS', ai: 'AI 답변',
+  messenger: '카카오톡·라인 등 메신저', naver_app: '네이버 앱', portal_app: '다음 앱', share: '발사탕 공유 링크', shop: '쇼핑몰', referral: '다른 사이트', direct: '직접 방문' };
 const BOT_KO = { googlebot: '구글 검색 로봇', naver: '네이버 검색 로봇 (Yeti)', daum: '다음 검색 로봇', bing: '빙 검색 로봇',
   kakao: '카카오톡 링크 미리보기', facebook: '페이스북·메타 미리보기', twitter: 'X 링크 미리보기', apple: '애플 검색 로봇',
   yandex: '얀덱스 로봇', baidu: '바이두 로봇', ai: 'AI 수집기 (GPT·Claude·Perplexity 등)', seo: 'SEO 분석 로봇',
@@ -129,7 +129,10 @@ const BOT_KO = { googlebot: '구글 검색 로봇', naver: '네이버 검색 로
 const kindName = k => KIND_KO[k] || k || '—';
 const botName = b => BOT_KO[b] || b || '로봇';
 const whoTag = (who, bot) => who === 'bot'
-  ? `<span class="tag warn" title="${$esc(bot || '')}">봇 · ${$esc(botName(bot))}</span>` : '<span class="tag good">사람</span>';
+  ? `<span class="tag warn" title="${$esc(bot || '')}">봇 · ${$esc(botName(bot))}</span>`
+  : who === 'owner' ? '<span class="tag info">내 방문</span>' : '<span class="tag good">사람</span>';
+/* 운영자 기기 표시 — 프론트 주소에 ?bs_owner=on 을 붙여 한 번 열면 그 브라우저가 '내 방문' 이 된다(track.js). */
+const OWNER_ON = 'https://balsatang.com/?bs_owner=on', OWNER_OFF = 'https://balsatang.com/?bs_owner=off';
 
 const st = { tab: 'dash', who: 'human', sess: [], sessTotal: 0, open: null };
 try { const s = JSON.parse(localStorage.getItem('balsatang.an.ui') || 'null'); if (s) { st.tab = s.tab || st.tab; st.who = s.who || st.who; } } catch { }
@@ -309,7 +312,7 @@ function bars(rows, key, labelFn, valFn) {
 
 const sec = (t, body, extra = '') => `<div class="card" style="margin-bottom:14px"><div class="sec-t">${t}${extra}</div>${body}</div>`;
 const hint = t => ` <span style="font-weight:500;color:var(--muted);font-size:11px">${t}</span>`;
-const whoNote = () => st.who === 'human' ? '' : st.who === 'bot' ? hint('— 봇만 센 숫자') : hint('— 사람과 봇을 합친 숫자');
+const whoNote = () => st.who === 'human' ? '' : st.who === 'bot' ? hint('— 봇만 센 숫자') : st.who === 'owner' ? hint('— 내 방문만 센 숫자') : hint('— 사람·봇·내 방문을 합친 숫자');
 
 /* ── 대시보드 — 요즘 어떤가. 핵심 숫자·추이·퍼널·유입 요약만. ── */
 function viewDash(d) {
@@ -318,7 +321,7 @@ function viewDash(d) {
   const ins = insights(d);
   const steps = [['방문', f.visited], ['탐색 (검색·카드)', f.explored], ['사료 상세', f.viewed_food], ['찜·비교·맞춤', f.engaged], ['구매 클릭', f.clicked_buy]];
   const env = k => (d.envs || []).filter(x => x.k === k).sort((a, b) => b.visitors - a.visitors);
-  const wb = (d.whos || []).find(x => x.who === 'bot');
+  const wb = (d.whos || []).find(x => x.who === 'bot'), wo = (d.whos || []).find(x => x.who === 'owner');
   return `
   <div class="kpis an-kpis">
     ${kpiTile('방문자', 'smile', c.visitors, p.visitors)}
@@ -328,7 +331,7 @@ function viewDash(d) {
     ${kpiTile('구매 클릭', 'coins', c.buy_clicks, p.buy_clicks, `${num(c.buyers)}명 · 방문자의 ${pct(c.buyers, c.visitors)}`)}
     ${kpiTile('맞춤 완료', 'paw', c.profiles, p.profiles)}
   </div>
-  ${st.who === 'human' && wb && wb.sessions ? `<div style="margin:-6px 0 14px;font-size:11.5px;color:var(--muted)">이 기간 봇 방문 ${num(wb.sessions)}회는 빼고 셌어요 · <a href="#" onclick="ANALYTICS.tab('traffic');return false" style="color:var(--pri-ink);font-weight:700">유입 탭에서 보기</a></div>` : ''}
+  ${st.who === 'human' && ((wb && wb.sessions) || (wo && wo.sessions)) ? `<div style="margin:-6px 0 14px;font-size:11.5px;color:var(--muted)">이 기간 ${[wb?.sessions ? `봇 방문 ${num(wb.sessions)}회` : '', wo?.sessions ? `내 방문 ${num(wo.sessions)}회` : ''].filter(Boolean).join(' · ')}는 빼고 셌어요 · <a href="#" onclick="ANALYTICS.tab('traffic');return false" style="color:var(--pri-ink);font-weight:700">유입 탭에서 보기</a></div>` : ''}
 
   ${ins.length ? sec('인사이트', ins.map(i => `<div class="todo"><span class="bul" style="background:${i.c}"></span><span style="line-height:1.6">${i.t}</span></div>`).join('')) : ''}
 
@@ -354,15 +357,21 @@ function viewDash(d) {
 /* ── 유입 — 어디서 왔고, 사람인가 ── */
 function viewTraffic(t, d) {
   const sum = Object.fromEntries((t.summary || []).map(x => [x.who, x]));
-  const h = sum.human || {}, b = sum.bot || {};
-  const all = (h.sessions || 0) + (b.sessions || 0);
+  const h = sum.human || {}, b = sum.bot || {}, o = sum.owner || {};
+  const all = (h.sessions || 0) + (b.sessions || 0) + (o.sessions || 0);
   const hk = splitSearch((t.kinds || []).filter(x => x.who === 'human'), (t.sources || []).filter(x => x.who === 'human'));
   return `
   <div class="kpis an-kpis">
     <div class="kpi ok"><div class="kpi-l">${ico('smile', 14)}사람 방문</div><div class="kpi-v">${num(h.sessions || 0)}</div><div class="kpi-s">${num(h.visitors || 0)}명</div></div>
     <div class="kpi"><div class="kpi-l">${ico('refresh', 14)}봇 방문</div><div class="kpi-v">${num(b.sessions || 0)}</div><div class="kpi-s">${num(b.visitors || 0)}개 기기 · 기록 ${num(b.events || 0)}건</div></div>
     <div class="kpi"><div class="kpi-l">${ico('chart', 14)}봇 비율</div><div class="kpi-v">${pct(b.sessions || 0, all)}</div><div class="kpi-s">전체 방문 ${num(all)}회 중</div></div>
+    <div class="kpi"><div class="kpi-l">${ico('paw', 14)}내 방문</div><div class="kpi-v">${num(o.sessions || 0)}</div><div class="kpi-s">${num(o.visitors || 0)}개 브라우저 · 숫자에서 뺌</div></div>
   </div>
+  ${sec('내 방문 빼기', `<div style="font-size:12.5px;line-height:1.75;color:var(--ink2)">
+    대표님이 쓰는 <b>폰·맥의 브라우저마다</b> 아래 링크를 한 번씩 열어 주세요. 그 브라우저의 방문(예전 것까지)이 '내 방문' 으로 빠져요.
+    카톡·네이버 앱 안에서 발사탕을 열어 보신다면 그 안에서도 한 번 열어야 해요 (브라우저마다 저장소가 따로라서).<br>
+    <a href="${OWNER_ON}" target="_blank" rel="noopener" style="color:var(--pri-ink);font-weight:700">${OWNER_ON} ↗</a>
+    <span style="color:var(--muted)"> · 끄기: <a href="${OWNER_OFF}" target="_blank" rel="noopener" style="color:var(--muted)">${OWNER_OFF}</a></span></div>`)}
 
   ${sec('일별 방문 — 사람 / 봇', `<div id="anStack"></div>
     <div style="display:flex;gap:14px;margin-top:8px;font-size:11.5px;color:var(--sub)">
@@ -381,7 +390,7 @@ function viewTraffic(t, d) {
   </div>
 
   ${sec('들어온 곳 자세히', table([
-    { h: '구분', f: r => r.who === 'bot' ? '<span class="tag warn">봇</span>' : '<span class="tag good">사람</span>' },
+    { h: '구분', f: r => r.who === 'bot' ? '<span class="tag warn">봇</span>' : r.who === 'owner' ? '<span class="tag info">내 방문</span>' : '<span class="tag good">사람</span>' },
     { h: '종류', f: r => $esc(r.kind === 'search' ? '검색 · ' + engineOf(r.source) : kindName(r.kind)) }, { h: '출처', f: r => `<span class="t-main">${$esc(r.source)}</span>` },
     { h: '방문', r: 1, f: r => num(r.sessions) }, { h: '사람/기기', r: 1, f: r => num(r.visitors) },
     { h: '구매 전환', r: 1, f: r => pct(r.buy_sessions, r.sessions) }], t.sources || []))}
@@ -770,7 +779,7 @@ function viewJourney(j) {
   return `
   ${j.leaveOn ? '' : `<div style="margin:-4px 0 12px;font-size:11.5px;color:var(--muted)">마지막 화면에 머문 시간은 오늘 배포분부터 쌓여요. 그 전 기록은 '바로 나감' 이 실제보다 많게 잡힐 수 있어요.</div>`}
   <div class="kpis an-kpis">
-    <div class="kpi"><div class="kpi-l">${ico('refresh', 14)}분석한 방문</div><div class="kpi-v">${num(total)}</div><div class="kpi-s">${st.who === 'human' ? '사람만' : st.who === 'bot' ? '봇만' : '전체'}</div></div>
+    <div class="kpi"><div class="kpi-l">${ico('refresh', 14)}분석한 방문</div><div class="kpi-v">${num(total)}</div><div class="kpi-s">${(WHO.find(w => w[0] === st.who) || [0, '전체'])[1]}</div></div>
     <div class="kpi ok"><div class="kpi-l">${ico('coins', 14)}구매 클릭으로 끝남</div><div class="kpi-v">${pct(n('bought'), total)}</div><div class="kpi-s">${num(n('bought'))}회</div></div>
     <div class="kpi"><div class="kpi-l">${ico('eye', 14)}10초 안에 나감</div><div class="kpi-v">${pct(n('bounce'), total)}</div><div class="kpi-s">${num(n('bounce'))}회</div></div>
     <div class="kpi alert"><div class="kpi-l">${ico('chart', 14)}막혀서 떠남</div><div class="kpi-v">${pct(trouble, total)}</div><div class="kpi-s">검색 0건·링크 없음·오류·맞춤 중단</div></div>

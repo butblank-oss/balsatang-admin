@@ -88,18 +88,27 @@ create policy admins_self on public.analytics_admins for select to authenticated
 --   human | crawler(검색 로봇 등) | automation(헤드리스 브라우저·자동화 도구) 를 적는다.
 -- 그 값이 없는 예전 기록은, 리눅스 데스크톱인데 화면 폭이 480 이하인 것(=헤드리스로 띄운
 -- 모바일 화면, 개발 중 자동 점검)을 봇으로 추정한다. 실제 사람이 그렇게 쓰는 일은 드물다.
+-- 운영자(대표님) 기기: 프론트에서 ?bs_owner=on 을 연 브라우저는 props.agent='owner' 로 적고,
+-- owner_mark 이벤트를 남긴다. 마지막 owner_mark 가 on 인 기기는 그 전 방문까지 'owner' 로 본다.
 create or replace function public.analytics_cls(p_lo timestamptz, p_hi timestamptz)
 returns table(session_id text, who text, bot text)
 language sql stable security definer set search_path = public as $$
-  with s as (
-    select e.session_id,
+  with own as (
+    select device_id from (
+      select distinct on (device_id) device_id, props->>'on' as on_
+      from events where name = 'owner_mark' order by device_id, ts desc
+    ) x where on_ = 'true'
+  ),
+  s as (
+    select e.session_id, min(e.device_id) as device_id,
       max(e.props->>'agent') filter (where e.name in ('session_start', 'first_visit')) as ag,
       max(e.props->>'bot')   filter (where e.name in ('session_start', 'first_visit')) as bt,
       bool_or(e.os = 'linux' and e.device = 'desktop' and e.vw <= 480) as legacy
     from events e where e.ts >= p_lo - interval '1 day' and e.ts < p_hi group by e.session_id
   )
   select s.session_id,
-    case when s.ag in ('crawler', 'automation') then 'bot'
+    case when s.ag = 'owner' or s.device_id in (select device_id from own) then 'owner'
+         when s.ag in ('crawler', 'automation') then 'bot'
          when s.ag = 'human' then 'human'
          when s.legacy then 'bot' else 'human' end,
     case when s.ag in ('crawler', 'automation') then coalesce(s.bt, s.ag)
@@ -111,9 +120,12 @@ revoke all on function public.analytics_cls(timestamptz, timestamptz) from publi
 -- 들어온 곳 이름 — utm 이 있으면 그것, 없으면 앞 사이트 도메인, 그것도 없으면 인앱 브라우저.
 create or replace function public.traffic_source(p_ref text, p_utm text, p_browser text)
 returns text language sql immutable as $$
-  select coalesce(nullif(lower(p_utm), ''), nullif(lower(p_ref), ''),
+  select coalesce(case when lower(p_utm) = 'share' then '발사탕 공유 링크' end, nullif(lower(p_utm), ''), nullif(lower(p_ref), ''),
     case p_browser when 'kakaotalk' then '카카오톡 앱' when 'instagram' then '인스타그램 앱'
-                   when 'naver' then '네이버 앱' when 'facebook' then '페이스북 앱' end,
+                   when 'naver' then '네이버 앱' when 'facebook' then '페이스북 앱'
+                   when 'band' then '네이버 밴드 앱' when 'line' then '라인 앱' when 'daum' then '다음 앱'
+                   when 'everytime' then '에브리타임 앱' when 'x' then 'X 앱' when 'threads' then '스레드 앱'
+                   when 'kakaostory' then '카카오스토리 앱' end,
     '(직접 방문)')
 $$;
 
@@ -122,18 +134,22 @@ $$;
 create or replace function public.traffic_kind(p_ref text, p_utm text, p_browser text)
 returns text language sql immutable as $$
   select case
-    when v = '' then case p_browser when 'kakaotalk' then 'messenger' when 'instagram' then 'social'
-                                    when 'facebook' then 'social' when 'naver' then 'naver_app' else 'direct' end
+    when v = 'share' then 'share'
+    when v = '' then case p_browser when 'kakaotalk' then 'messenger' when 'line' then 'messenger'
+                                    when 'instagram' then 'social' when 'facebook' then 'social' when 'x' then 'social'
+                                    when 'threads' then 'social' when 'kakaostory' then 'social'
+                                    when 'band' then 'community' when 'everytime' then 'community'
+                                    when 'naver' then 'naver_app' when 'daum' then 'portal_app' else 'direct' end
     when v ~ '(^|\.)(youtube\.com|youtu\.be)$' or v in ('youtube', 'yt') then 'video'
-    when v ~ '(^|\.)(blog|cafe|post|in|kin)\.naver\.com$' or v ~ '(tistory\.com|brunch\.co\.kr|velog\.io|cafe\.daum\.net)$'
-         or v in ('blog', 'naverblog', 'cafe', 'tistory') then 'community'
+    when v ~ '(^|\.)(blog|cafe|post|in|kin)\.naver\.com$' or v ~ '(tistory\.com|brunch\.co\.kr|velog\.io|cafe\.daum\.net|band\.us|everytime\.kr|dcinside\.com|clien\.net|theqoo\.net|fmkorea\.com)$'
+         or v in ('blog', 'naverblog', 'cafe', 'tistory', 'band', 'everytime') then 'community'
     when v ~ '(chatgpt\.com|chat\.openai\.com|perplexity\.ai|claude\.ai|gemini\.google\.com|copilot\.microsoft\.com)$'
          or v in ('chatgpt', 'perplexity', 'claude', 'gemini', 'copilot') then 'ai'
     when v ~ '(^|\.)(google\.[a-z.]+|naver\.com|daum\.net|bing\.com|zum\.com|yahoo\.[a-z.]+|duckduckgo\.com|baidu\.com|ecosia\.org)$'
          or v in ('google', 'naver', 'daum', 'bing', 'zum') then 'search'
     when v ~ '(instagram\.com|facebook\.com|threads\.net|threads\.com|tiktok\.com|(^|\.)x\.com|(^|\.)t\.co|twitter\.com)$'
          or v in ('instagram', 'ig', 'facebook', 'fb', 'threads', 'tiktok', 'x', 'twitter') then 'social'
-    when v ~ 'kakao' then 'messenger'
+    when v ~ 'kakao|(^|\.)line\.me$' or v in ('line', 'telegram') then 'messenger'
     when v ~ '(coupang\.com|smartstore\.naver\.com)$' then 'shop'
     else 'referral' end
   from (select lower(coalesce(nullif(p_utm, ''), nullif(p_ref, ''), '')) as v) x
