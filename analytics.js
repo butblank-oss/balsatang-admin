@@ -117,7 +117,7 @@ const screenName = s => SCREEN_KO[s] || s || '(알 수 없음)';
    한 화면에 표 열여섯 개를 쌓았더니 무엇을 봐야 할지 몰랐다. 질문 단위로 나눈다.
    대시보드(요즘 어때?) · 유입(어디서 왔어? 사람이야?) · 세션(한 사람은 뭘 했어?)
    · 사료·검색(뭘 찾았어?) · 행동·오류(어디서 막혔어?) */
-const TABS = [['dash', '대시보드'], ['traffic', '유입 · 사람/봇'], ['sessions', '세션별'], ['foods', '사료 · 검색'], ['acts', '행동 · 오류']];
+const TABS = [['dash', '대시보드'], ['traffic', '유입 · 사람/봇'], ['sessions', '세션별'], ['gsc', '검색어 (구글)'], ['foods', '사료 · 검색'], ['acts', '행동 · 오류']];
 const WHO = [['human', '사람만'], ['bot', '봇만'], ['all', '전체']];
 const KIND_KO = { search: '검색 (구글·네이버 등)', video: '유튜브', community: '블로그·카페', social: 'SNS', ai: 'AI 답변',
   messenger: '카카오톡 등 메신저', naver_app: '네이버 앱', shop: '쇼핑몰', referral: '다른 사이트', direct: '직접 방문' };
@@ -151,7 +151,7 @@ function shell(inner) {
   <div class="tabs" id="anTabs" style="flex-wrap:wrap">${TABS.map(([k, l]) => `<button class="${st.tab === k ? 'on' : ''}" data-t="${k}">${l}</button>`).join('')}</div>
   <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px">
     <div class="seg" id="anRange">${[[1, '오늘'], [7, '7일'], [30, '30일'], [90, '90일']].map(([d, l]) => segBtn(range.days === d, 'data-d', d, l)).join('')}</div>
-    ${st.tab === 'traffic' ? '' : `<div class="seg" id="anWho" title="봇: 검색 로봇·자동화 브라우저(자동 점검 포함)">${WHO.map(([k, l]) => segBtn(st.who === k, 'data-w', k, l)).join('')}</div>`}
+    ${st.tab === 'traffic' || st.tab === 'gsc' ? '' : `<div class="seg" id="anWho" title="봇: 검색 로봇·자동화 브라우저(자동 점검 포함)">${WHO.map(([k, l]) => segBtn(st.who === k, 'data-w', k, l)).join('')}</div>`}
     <span style="font-size:11px;color:var(--muted)" id="anRangeTxt"></span>
     <div style="flex:1"></div>
     <button class="btn sm" id="anRefresh">새로고침</button>
@@ -208,6 +208,18 @@ function openLogin(errMsg) {
 }
 
 async function page() {
+  /* 검색어 탭은 Supabase 가 아니라 구글에서 읽는다 — 분석 로그인 없이도 열린다. */
+  if (st.tab === 'gsc') {
+    shell(`<div class="card"><div class="empty">불러오는 중…</div></div>`);
+    const { from, to } = rangeDates();
+    el('anRangeTxt').textContent = `${from} ~ ${to}`;
+    try { await viewGsc(el('anBody')); }
+    catch (e) {
+      if (e.gauth) { page(); return; }
+      el('anBody').innerHTML = `<div class="card"><div class="empty" style="color:#B91C1C">${$esc(e.message)}</div></div>`;
+    }
+    return;
+  }
   if (!cfg().url || !ls.get(SES_KEY)) {
     shell(`<div class="card"><div class="empty">
       ${ico('chart', 40)}<div style="margin-top:14px">사용 분석을 보려면 로그인해 주세요</div>
@@ -323,7 +335,7 @@ function viewDash(d) {
     ${sec('전환 퍼널' + hint('— 기간 내 기기 기준'),
       bars(steps.map(([l, v]) => ({ l, v: v || 0 })), 'v', r => r.l, r => `${num(r.v)} · ${pct(r.v, f.visited)}`))}
     ${sec('어디서 왔나' + hint('— 방문 기준'), (d.kinds || []).length
-      ? bars(d.kinds, 'sessions', r => $esc(kindName(r.kind)), r => `${num(r.sessions)} · 구매 ${pct(r.buy_sessions, r.sessions)}`)
+      ? bars(splitSearch(d.kinds, d.sources), 'sessions', r => $esc(kindLabel(r)), r => `${num(r.sessions)} · 구매 ${pct(r.buy_sessions, r.sessions)}`)
       : table([{ h: '경로', f: r => $esc(r.source) }, { h: '방문', r: 1, f: r => num(r.sessions) }], d.sources || []))}
   </div>
 
@@ -341,7 +353,7 @@ function viewTraffic(t, d) {
   const sum = Object.fromEntries((t.summary || []).map(x => [x.who, x]));
   const h = sum.human || {}, b = sum.bot || {};
   const all = (h.sessions || 0) + (b.sessions || 0);
-  const hk = (t.kinds || []).filter(x => x.who === 'human');
+  const hk = splitSearch((t.kinds || []).filter(x => x.who === 'human'), (t.sources || []).filter(x => x.who === 'human'));
   return `
   <div class="kpis an-kpis">
     <div class="kpi ok"><div class="kpi-l">${ico('smile', 14)}사람 방문</div><div class="kpi-v">${num(h.sessions || 0)}</div><div class="kpi-s">${num(h.visitors || 0)}명</div></div>
@@ -356,7 +368,7 @@ function viewTraffic(t, d) {
 
   <div class="grid2 an2">
     ${sec('사람은 어디서 왔나', hk.length
-      ? bars(hk, 'sessions', r => $esc(kindName(r.kind)), r => `${num(r.sessions)} · 구매 ${pct(r.buy_sessions, r.sessions)}`)
+      ? bars(hk, 'sessions', r => $esc(kindLabel(r)), r => `${num(r.sessions)} · 구매 ${pct(r.buy_sessions, r.sessions)}`)
       : '<div class="empty" style="padding:28px">아직 기록이 없어요</div>')}
     ${sec('봇 종류', table([
       { h: '봇', f: r => `<div class="t-main">${$esc(botName(r.bot))}</div><div style="font-size:10.5px;color:var(--muted)">${$esc(r.bot || '')}</div>` },
@@ -367,7 +379,7 @@ function viewTraffic(t, d) {
 
   ${sec('들어온 곳 자세히', table([
     { h: '구분', f: r => r.who === 'bot' ? '<span class="tag warn">봇</span>' : '<span class="tag good">사람</span>' },
-    { h: '종류', f: r => $esc(kindName(r.kind)) }, { h: '출처', f: r => `<span class="t-main">${$esc(r.source)}</span>` },
+    { h: '종류', f: r => $esc(r.kind === 'search' ? '검색 · ' + engineOf(r.source) : kindName(r.kind)) }, { h: '출처', f: r => `<span class="t-main">${$esc(r.source)}</span>` },
     { h: '방문', r: 1, f: r => num(r.sessions) }, { h: '사람/기기', r: 1, f: r => num(r.visitors) },
     { h: '구매 전환', r: 1, f: r => pct(r.buy_sessions, r.sessions) }], t.sources || []))}
 
@@ -436,7 +448,7 @@ function viewSessions() {
     <tbody>${rows.map(r => `<tr data-sid="${$esc(r.session_id)}" style="cursor:pointer${st.open === r.session_id ? ';background:var(--panel2)' : ''}">
       <td style="white-space:nowrap">${hhmm(r.started)}<div style="font-size:10.5px;color:var(--muted)">${r.is_new ? '첫 방문' : '재방문'} · <span style="font-family:ui-monospace,monospace">${$esc(String(r.device_id).slice(0, 6))}</span></div></td>
       <td>${whoTag(r.who, r.bot)}</td>
-      <td><div class="t-main">${$esc(kindName(r.kind))}</div><div style="font-size:10.5px;color:var(--muted)">${$esc(r.source || '')}</div></td>
+      <td><div class="t-main">${$esc(r.kind === 'search' ? '검색 · ' + engineOf(r.source) : kindName(r.kind))}</div><div style="font-size:10.5px;color:var(--muted)">${$esc(r.source || '')}</div></td>
       <td style="white-space:nowrap">${$esc([r.device, r.os, r.browser].filter(Boolean).join(' · '))}</td>
       <td style="text-align:right;white-space:nowrap">${dur(r.started, r.ended)}</td>
       <td style="text-align:right">${num(r.screens)}</td><td style="text-align:right">${num(r.foods)}</td><td style="text-align:right">${num(r.searches)}</td>
@@ -518,6 +530,172 @@ function viewActs(d, ev) {
     { h: '내용', f: r => `<span style="color:var(--sub)">${$esc(describe(r))}</span>` }], ev || []))}`;
 }
 
+/* ── 검색엔진 나누기 ──
+   '검색' 하나로 묶으면 네이버로 오는지 구글로 오는지가 안 보인다. 출처 도메인으로 엔진을 가른다.
+   (검색어는 엔진이 넘겨주지 않는다 — 구글 검색어는 '검색어' 탭에서 서치 콘솔로 본다.) */
+const ENGINES = [['네이버', /(^|\.)naver\.com$|^naver$/], ['구글', /(^|\.)google\.[a-z.]+$|^google$/], ['다음', /(^|\.)daum\.net$|^daum$/],
+  ['빙', /(^|\.)bing\.com$|^bing$/], ['줌', /(^|\.)zum\.com$|^zum$/], ['야후', /(^|\.)yahoo\.[a-z.]+$/], ['덕덕고', /duckduckgo\.com$/], ['바이두', /baidu\.com$/]];
+const engineOf = src => (ENGINES.find(([, re]) => re.test(String(src || '').toLowerCase())) || [src || '기타'])[0];
+/* kinds(종류별 합계) 에서 검색 한 줄을 엔진별 줄로 바꾼다. sources 에 종류·출처가 같이 있어야 한다. */
+function splitSearch(kinds, sources) {
+  const srch = (sources || []).filter(x => x.kind === 'search');
+  if (!srch.length) return kinds;
+  const by = {};
+  for (const x of srch) {
+    const e = engineOf(x.source);
+    const o = by[e] || (by[e] = { kind: 'search', engine: e, sessions: 0, buy_sessions: 0 });
+    o.sessions += x.sessions || 0; o.buy_sessions += x.buy_sessions || 0;
+  }
+  /* 출처 표는 상위 몇십 개만 온다. 거기 안 든 검색 방문은 '기타' 로 남겨 합이 맞게 한다. */
+  const k = kinds.find(x => x.kind === 'search');
+  const got = Object.values(by).reduce((n, x) => n + x.sessions, 0);
+  if (k && k.sessions > got) by['기타'] = { kind: 'search', engine: '기타', sessions: k.sessions - got, buy_sessions: Math.max(0, (k.buy_sessions || 0) - Object.values(by).reduce((n, x) => n + x.buy_sessions, 0)) };
+  return kinds.filter(k => k.kind !== 'search').concat(Object.values(by)).sort((a, b) => b.sessions - a.sessions);
+}
+const kindLabel = r => r.engine ? `검색 · ${r.engine}` : kindName(r.kind);
+
+/* ── 구글 서치 콘솔 — 어떤 검색어로 들어왔나 ──
+   브라우저에서 바로 구글에 로그인해 읽기 전용 권한(webmasters.readonly)을 받는다.
+   서버가 없어서 비밀 키를 둘 곳이 없다 — OAuth 클라이언트 ID 는 원래 공개되는 값이고,
+   받은 접근 토큰은 이 탭(sessionStorage)에만 1시간 둔다. 네이버는 이런 API 가 없다. */
+const GSC_CID = 'balsatang.gsc.cid', GSC_SITE = 'balsatang.gsc.site', GSC_TOK = 'balsatang.gsc.tok';
+const gscCid = () => ls.get(GSC_CID) || '';
+function gscTok() {
+  try { const t = JSON.parse(sessionStorage.getItem(GSC_TOK) || 'null'); return t && Date.now() < t.exp - 60000 ? t.v : null; } catch { return null; }
+}
+function gisLoad() {
+  return new Promise((res, rej) => {
+    if (global.google?.accounts?.oauth2) return res();
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client'; s.async = true;
+    s.onload = () => res(); s.onerror = () => rej(new Error('구글 로그인 스크립트를 불러오지 못했어요'));
+    document.head.appendChild(s);
+  });
+}
+async function gscLogin() {
+  await gisLoad();
+  return new Promise((res, rej) => {
+    const c = global.google.accounts.oauth2.initTokenClient({
+      client_id: gscCid(), scope: 'https://www.googleapis.com/auth/webmasters.readonly',
+      callback: r => {
+        if (r.error) return rej(new Error(r.error_description || r.error));
+        try { sessionStorage.setItem(GSC_TOK, JSON.stringify({ v: r.access_token, exp: Date.now() + (r.expires_in || 3600) * 1000 })); } catch { }
+        res(r.access_token);
+      },
+      error_callback: e => rej(new Error(e.type === 'popup_closed' ? '로그인 창을 닫았어요' : e.type === 'popup_failed_to_open' ? '팝업이 막혔어요 — 주소창 오른쪽에서 팝업을 허용해 주세요' : (e.message || e.type)))
+    });
+    c.requestAccessToken();
+  });
+}
+async function gapi(path, body) {
+  const t = gscTok();
+  if (!t) throw Object.assign(new Error('구글 로그인이 필요해요'), { gauth: true });
+  const r = await fetch('https://www.googleapis.com/webmasters/v3' + path, {
+    method: body ? 'POST' : 'GET', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 401) { try { sessionStorage.removeItem(GSC_TOK); } catch { } throw Object.assign(new Error('구글 로그인이 만료됐어요'), { gauth: true }); }
+  if (!r.ok) throw new Error(j.error?.message || `구글 응답 ${r.status}`);
+  return j;
+}
+async function gscSite() {
+  const list = (await gapi('/sites')).siteEntry || [];
+  const ok = list.filter(s => s.permissionLevel !== 'siteUnverifiedUser');
+  const saved = ls.get(GSC_SITE);
+  const pick = ok.find(s => s.siteUrl === saved) || ok.find(s => s.siteUrl === 'sc-domain:balsatang.com')
+    || ok.find(s => /balsatang\.com/.test(s.siteUrl) && !/admin\./.test(s.siteUrl)) || ok[0];
+  return { list: ok, site: pick?.siteUrl || null };
+}
+const gq = (site, from, to, dims, n = 100) => gapi(`/sites/${encodeURIComponent(site)}/searchAnalytics/query`,
+  { startDate: from, endDate: to, dimensions: dims, rowLimit: n, dataState: 'all' });
+
+function gscSetup(msg) {
+  global.showModal(`<div class="modal" style="max-width:600px">
+    <div class="modal-h"><b>구글 서치 콘솔 연결</b>
+      <p>처음 한 번만 하면 돼요. 구글 클라우드에서 <b>OAuth 클라이언트 ID</b> 를 만들어 아래에 붙여 넣으세요.
+      클라이언트 ID 는 공개돼도 되는 값이에요(비밀번호가 아니에요).</p></div>
+    <ol style="margin:0 0 12px 18px;font-size:12.5px;line-height:1.8;color:var(--ink2)">
+      <li><a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener">console.cloud.google.com</a> 에서 새 프로젝트 만들기 (이름: balsatang-admin)</li>
+      <li><a href="https://console.cloud.google.com/apis/library/searchconsole.googleapis.com" target="_blank" rel="noopener">Google Search Console API</a> → <b>사용</b></li>
+      <li><a href="https://console.cloud.google.com/auth/overview" target="_blank" rel="noopener">OAuth 동의 화면</a> → 앱 이름 '발사탕 어드민', 대상 <b>외부</b>, <b>테스트 사용자</b>에 서치 콘솔을 쓰는 내 구글 계정 추가</li>
+      <li><a href="https://console.cloud.google.com/auth/clients/create" target="_blank" rel="noopener">클라이언트 만들기</a> → 유형 <b>웹 애플리케이션</b> → 승인된 JavaScript 원본에 <code>https://admin.balsatang.com</code></li>
+      <li>만들어진 <b>클라이언트 ID</b>(…apps.googleusercontent.com) 복사해서 아래에</li>
+    </ol>
+    <label>클라이언트 ID<input id="gCid" value="${$esc(gscCid())}" placeholder="1234-abcd.apps.googleusercontent.com" autocapitalize="off" spellcheck="false"></label>
+    <div id="gMsg" style="min-height:18px;font-size:12px;color:var(--bad)">${$esc(msg || '')}</div>
+    <div class="modal-f"><button class="btn" onclick="closeModal()">닫기</button>
+      <button class="btn pri" id="gGo">저장하고 로그인</button></div>
+  </div>`);
+  el('gGo').onclick = async () => {
+    const v = el('gCid').value.trim();
+    if (!/\.apps\.googleusercontent\.com$/.test(v)) { el('gMsg').textContent = '…apps.googleusercontent.com 으로 끝나는 값이에요'; return; }
+    ls.set(GSC_CID, v);
+    try { await gscLogin(); global.closeModal(); page(); } catch (e) { el('gMsg').textContent = e.message; }
+  };
+}
+
+async function viewGsc(body) {
+  const naver = sec('네이버 검색어', `<div style="font-size:12.5px;line-height:1.7;color:var(--ink2)">네이버는 검색어를 가져오는 방법(API)을 주지 않아요.
+    <a href="https://searchadvisor.naver.com/console/board" target="_blank" rel="noopener" style="color:var(--pri-ink);font-weight:700">서치어드바이저 ↗</a> → 리포트 → <b>검색 유입</b> 에서 봐 주세요.</div>`);
+  if (!gscCid()) {
+    body.innerHTML = sec('구글 검색어', `<div class="empty" style="padding:28px">${ico('search', 34)}
+      <div style="margin-top:12px">구글에서 어떤 검색어로 들어왔는지 보려면 서치 콘솔을 한 번 연결해야 해요</div>
+      <button class="btn pri" style="margin-top:14px" onclick="ANALYTICS.gscSetup()">연결하기</button></div>`) + naver;
+    return;
+  }
+  if (!gscTok()) {
+    body.innerHTML = sec('구글 검색어', `<div class="empty" style="padding:28px">
+      <div>구글 계정으로 로그인하면 검색어를 불러와요 (읽기 전용)</div>
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:14px">
+        <button class="btn pri" id="gIn">구글 로그인</button><button class="btn ghost" onclick="ANALYTICS.gscSetup()">연결 설정</button></div></div>`) + naver;
+    el('gIn').onclick = async () => { try { await gscLogin(); page(); } catch (e) { global.toast(e.message); } };
+    return;
+  }
+  const { from, to } = rangeDates();
+  const { list, site } = await gscSite();
+  if (!site) {
+    body.innerHTML = sec('구글 검색어', '<div class="empty" style="padding:28px">이 구글 계정으로 볼 수 있는 서치 콘솔 사이트가 없어요. 서치 콘솔에 balsatang.com 을 등록한 계정으로 로그인해 주세요.</div>') + naver;
+    return;
+  }
+  const [tot, qs, pages, dev] = await Promise.all([gq(site, from, to, [], 1), gq(site, from, to, ['query'], 200), gq(site, from, to, ['page'], 50), gq(site, from, to, ['device'], 5)]);
+  const T = (tot.rows || [])[0] || { clicks: 0, impressions: 0, ctr: 0, position: 0 };
+  const p1 = v => (Math.round(v * 1000) / 10) + '%';
+  const pos = v => v ? (Math.round(v * 10) / 10) + '위' : '—';
+  const q = qs.rows || [];
+  const miss = q.filter(r => r.impressions >= 20 && r.ctr < 0.02).slice(0, 10);
+  const devKo = { MOBILE: '휴대폰', DESKTOP: 'PC', TABLET: '태블릿' };
+  body.innerHTML = `
+  <div style="display:flex;align-items:center;gap:8px;margin:-4px 0 12px;font-size:11.5px;color:var(--muted)">
+    <span>구글 서치 콘솔 · ${list.length > 1 ? `<select id="gSite" style="font-size:11.5px">${list.map(s => `<option ${s.siteUrl === site ? 'selected' : ''}>${$esc(s.siteUrl)}</option>`).join('')}</select>` : $esc(site)}</span>
+    <span>· 최근 2~3일은 아직 덜 모인 숫자예요</span></div>
+  <div class="kpis an-kpis">
+    <div class="kpi"><div class="kpi-l">${ico('eye', 14)}노출</div><div class="kpi-v">${num(T.impressions)}</div><div class="kpi-s">구글 검색 결과에 보인 횟수</div></div>
+    <div class="kpi"><div class="kpi-l">${ico('smile', 14)}클릭</div><div class="kpi-v">${num(T.clicks)}</div><div class="kpi-s">눌러서 들어온 횟수</div></div>
+    <div class="kpi"><div class="kpi-l">${ico('chart', 14)}클릭률</div><div class="kpi-v">${p1(T.ctr)}</div><div class="kpi-s">노출 중 클릭 비율</div></div>
+    <div class="kpi"><div class="kpi-l">${ico('trophy', 14)}평균 순위</div><div class="kpi-v">${pos(T.position)}</div><div class="kpi-s">낮을수록 위쪽</div></div>
+  </div>
+  ${miss.length ? sec('보이는데 안 눌리는 검색어' + hint('— 노출 20회 이상 · 클릭률 2% 미만 → 제목·설명을 다듬을 후보'), table([
+    { h: '검색어', f: r => `<b>${$esc(r.keys[0])}</b>` }, { h: '노출', r: 1, f: r => num(r.impressions) },
+    { h: '클릭', r: 1, f: r => num(r.clicks) }, { h: '순위', r: 1, f: r => pos(r.position) }], miss)) : ''}
+  ${sec(`구글 검색어 ${num(q.length)}개` + hint('— 클릭 순'), table([
+    { h: '검색어', f: r => `<span class="t-main">${$esc(r.keys[0])}</span>` }, { h: '클릭', r: 1, f: r => num(r.clicks) },
+    { h: '노출', r: 1, f: r => num(r.impressions) }, { h: '클릭률', r: 1, f: r => p1(r.ctr) }, { h: '평균 순위', r: 1, f: r => pos(r.position) }],
+    q, '이 기간에 구글 검색 기록이 없어요. 사이트가 새로 등록됐다면 며칠 뒤부터 쌓여요.'))}
+  <div class="grid2 an2">
+    ${sec('검색으로 들어온 페이지', table([
+      { h: '페이지', f: r => { const path = decodeURIComponent(String(r.keys[0]).replace(/^https?:\/\/[^/]+/, '')) || '/';
+        const id = (path.match(/^\/food\/([^/]+)/) || [])[1];
+        return id ? `<div class="t-main">${$esc(foodName(id))}</div><div style="font-size:10.5px;color:var(--muted)">${$esc(path)}</div>` : $esc(path); } },
+      { h: '클릭', r: 1, f: r => num(r.clicks) }, { h: '노출', r: 1, f: r => num(r.impressions) }], pages.rows || []))}
+    ${sec('기기', table([{ h: '기기', f: r => devKo[r.keys[0]] || r.keys[0] }, { h: '클릭', r: 1, f: r => num(r.clicks) },
+      { h: '노출', r: 1, f: r => num(r.impressions) }], dev.rows || []))}
+  </div>
+  ${naver}
+  <div style="text-align:right;margin-top:-4px"><button class="btn sm ghost" onclick="ANALYTICS.gscSetup()">연결 설정</button></div>`;
+  const sel = document.getElementById('gSite');
+  if (sel) sel.onchange = () => { ls.set(GSC_SITE, sel.value); page(); };
+}
+
 function cohortCell(r, n) {
   const v = r['w' + n];
   const wkEnd = new Date(r.wk).getTime() + (n + 1) * 7 * 86400e3;
@@ -586,5 +764,5 @@ function wireChart(d) {
 }
 
 global.ANALYTICS = { page, openLogin, logout, last: () => last,
-  tab(t) { st.tab = t; st.open = null; saveUi(); page(); } };
+  tab(t) { st.tab = t; st.open = null; saveUi(); page(); }, gscSetup: m => gscSetup(m) };
 })(window);
