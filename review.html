@@ -49,7 +49,88 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
   border-bottom:1px solid var(--line);padding:14px 16px;padding-top:calc(14px + env(safe-area-inset-top))}
 .top h1{font-size:16px;font-weight:700;letter-spacing:-.02em}
 .top .meta{color:var(--sub);font-size:12px;margin-top:3px}
-.wrap{max-width:860px;margin:0 auto;padding:16px}
+.wrap{max-width:1200px;margin:0 auto;padding:16px}
+/* ── 카드 본문: 왼쪽 입력 · 오른쪽 프론트 미리보기 ──
+   무엇을 넣으면 사이트에 어떻게 보이는지 바로 옆에서 보이게 한다.
+   좁은 화면에서는 미리보기가 입력 아래로 내려간다. */
+.cols{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:18px;align-items:start}
+.rcol{position:sticky;top:12px}
+@media(max-width:1020px){.cols{grid-template-columns:1fr}.rcol{position:static}}
+/* 남은 일 — 카드를 열면 맨 위에서 한눈에 */
+.todo{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.todo span{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 11px;border-radius:99px;
+  font-size:12.5px;font-weight:600;border:1px solid var(--line);background:var(--panel);color:var(--sub)}
+.todo span.ok{border-color:#CFE7D7;background:var(--good-soft);color:var(--good)}
+.todo span.no{border-color:#EFDFC4;background:var(--warn-soft);color:var(--warn)}
+.hd .thumb{width:44px;height:44px;border-radius:8px;object-fit:contain;background:#fff;border:1px solid var(--line);flex-shrink:0}
+.hd .thumb.none{display:flex;align-items:center;justify-content:center;color:var(--muted);font-weight:700}
+.b.left{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
+/* 프론트 미리보기 — 사이트 화면을 줄여 그린 것. 값은 발행과 같은 함수(PUB.finalize)에서 온다. */
+.pv{border:1px solid var(--line);border-radius:var(--r-lg);background:#fff;overflow:hidden}
+.pv-h{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--panel2);
+  border-bottom:1px solid var(--line);font-size:12px;font-weight:700;color:var(--sub)}
+.pv-sec{padding:14px;border-bottom:1px solid var(--line)}
+.pv-sec:last-child{border-bottom:none}
+.pv-k{font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px}
+.pv-card{display:flex;gap:12px;align-items:center}
+.pv-card img,.pv-card .ph{width:72px;height:72px;border-radius:10px;object-fit:contain;background:var(--panel2);flex-shrink:0}
+.pv-card .ph{display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:var(--muted)}
+.pv-brand{font-size:12px;color:var(--sub)}
+.pv-name{font-size:15px;font-weight:700;letter-spacing:-.02em;line-height:1.35}
+.pv-score{margin-left:auto;text-align:center;flex-shrink:0}
+.pv-score b{display:block;font-size:22px;font-weight:800;color:var(--pri-ink);line-height:1}
+.pv-score span{font-size:10.5px;color:var(--muted)}
+.pv-stars{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-top:10px;font-size:12px}
+.pv-stars div{display:flex;justify-content:space-between}
+.pv-stars i{font-style:normal;color:#E0A100;letter-spacing:1px}
+.pv-stars i.na{color:var(--muted);letter-spacing:0}
+.pv-price{margin-top:8px;font-size:12.5px;color:var(--sub)}
+.pv-price b{color:var(--ink)}
+.pv-tag{display:inline-block;margin-top:8px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px}
+.pv-tag.dom{background:var(--good-soft);color:var(--good)}
+.pv-tag.ovs{background:var(--warn-soft);color:var(--warn)}
+.pv-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.pv-grid div{background:var(--panel2);border-radius:8px;padding:7px 9px}
+.pv-grid span{display:block;font-size:10.5px;color:var(--muted)}
+.pv-grid b{font-size:13px}
+.pv-grid b.na{color:var(--bad)}
+.pv-note{margin-top:8px;font-size:11.5px;color:var(--sub);line-height:1.5}
+.pv-v{display:flex;gap:8px;padding:8px 0;border-bottom:1px dashed var(--line);font-size:12.5px}
+.pv-v:last-child{border-bottom:none}
+.pv-v .ic{flex-shrink:0;width:20px;height:20px;border-radius:99px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800}
+.pv-v .ic.pos{background:var(--good-soft);color:var(--good)}
+.pv-v .ic.cau{background:var(--warn-soft);color:var(--warn)}
+.pv-v b{display:block;font-size:12.5px}
+.pv-v span{color:var(--sub);font-size:11.5px;line-height:1.5}
+.pv-more{font-size:11px;color:var(--warn);margin-top:6px}
+.pv-fit{font-size:12px;margin:3px 0;line-height:1.5}
+.pv-fit b{font-weight:700}
+.pv-empty{font-size:12px;color:var(--muted)}
+/* ⑤ 소비자 문구 편집 */
+.vrow{border:1px solid var(--line);border-radius:var(--r);padding:10px;margin-bottom:8px;background:var(--panel)}
+.vrow .top2{display:flex;gap:8px;align-items:center;margin-bottom:6px}
+.vrow select{width:auto;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);font-size:12px;font-weight:700}
+.vrow input,.vrow textarea,.fitrow input{width:100%;padding:8px 10px;border-radius:var(--r);border:1px solid var(--line);background:var(--panel2);font-size:13px}
+.vrow input{font-weight:600;margin-bottom:6px}
+.vrow textarea{min-height:48px;resize:vertical;font-size:12.5px;line-height:1.55}
+.vrow input:focus,.vrow textarea:focus,.fitrow input:focus{outline:none;border-color:var(--pri)}
+.mini{padding:6px 11px;border-radius:var(--r);border:1px solid var(--line);background:var(--panel);color:var(--sub);font-size:12px;font-weight:600;cursor:pointer}
+.mini:hover{border-color:var(--muted);color:var(--ink)}
+.mini.del{margin-left:auto}
+.vtools{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.vtools select{padding:6px 8px;border-radius:var(--r);border:1px solid var(--line);background:var(--panel);font-size:12px;max-width:260px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 8px}
+.chip{height:28px;padding:0 11px;border-radius:99px;border:1px solid var(--line);background:var(--panel);font-size:12px;font-weight:600;color:var(--sub);cursor:pointer}
+.chip.on{border-color:var(--pri);background:var(--pri-soft);color:var(--pri-ink)}
+.fitrow{display:grid;grid-template-columns:110px 1fr;gap:8px;align-items:center;margin-bottom:6px}
+.fitrow .k{font-size:12px;font-weight:600;color:var(--sub)}
+.subh{font-size:12.5px;font-weight:700;margin:14px 0 4px}
+.subh.good{color:var(--good)} .subh.warn{color:var(--warn)}
+.state{font-size:11px;font-weight:700;padding:1px 7px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
+.state.mine{border-color:var(--warn);color:var(--warn);background:var(--warn-soft)}
+/* 입력칸 모양을 하나로 — 칸마다 높이·바탕이 달라 어디가 입력하는 곳인지 헷갈렸다 */
+.f input,.f select,.namebox input{height:38px;background:#fff}
+.f label{font-size:12px}
 
 .stat{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
 .stat div{flex:1;min-width:88px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px}
@@ -259,9 +340,10 @@ document.write(['engine/dict.js', 'engine/phrases.js', 'engine/engine.js',
                 'engine/policy.js', 'engine/gate1.js', 'engine/label.js']
   .map(function (f) { return '<scr' + 'ipt src="' + window.APP_BASE + f + '"><\/scr' + 'ipt>'; }).join(''));
 </script>
-<script src="github.js?v=20261007c"></script>
-<script src="publish.js?v=20261007c"></script>
+<script src="github.js?v=20261008a"></script>
+<script src="publish.js?v=20261008a"></script>
 <script>
+const TYPE_KO={dry:'건식',wet:'습식',air_dried:'에어드라이',freeze_dried:'동결건조',raw:'화식'};
 const RATING_LABEL={quality:'원료',carb:'탄수화물',additive:'첨가물',value:'가성비'};
 /* evidence 키('ratings.quality','price.p')를 사람이 읽는 이름으로 */
 const EV_LABEL={'price.p':'가격','price.wg':'중량','facts.protein':'조단백',
@@ -346,7 +428,8 @@ function isEdited(it){
   const e=edits[it.stagingId];
   if(!e)return false;
   return Object.keys(e.facts||{}).length>0||Object.keys(e.price||{}).length>0
-       ||Object.keys(e.meta||{}).length>0||Object.keys(e.ga||{}).length>0||!!e.label||!!e.override;
+       ||Object.keys(e.meta||{}).length>0||Object.keys(e.ga||{}).length>0||!!e.label||!!e.override
+       ||!!e.verdict||!!e.fit;
 }
 
 /* ── 라벨을 채운 뒤의 항목 ──
@@ -642,6 +725,136 @@ function editBlock(it){
   </div>`;
 }
 
+
+/* ══ 발행될 모양 ══
+   발행 버튼이 쓰는 PUB.finalize 를 그대로 불러 사료 카드와 상세를 만든다.
+   미리보기와 실제 사이트가 같은 함수에서 나오므로 '봤던 것과 다르게 올라가는' 일이 없다. */
+function record(it){
+  try{ return PUB.finalize(merged(it), edits[it.stagingId], 'preview', new Date().toISOString()); }
+  catch(err){ console.warn(err); return {food:merged(it).proposed, detail:null}; }
+}
+const KIND_KO={pos:'좋은 점',cau:'주의할 점',dan:'위험'};
+const concernKo=k=>PHRASES.concerns?.[k]?.label||k;
+const clone=o=>JSON.parse(JSON.stringify(o));
+
+/* ── 남은 일 ── 카드를 열자마자 무엇이 비었는지 보이게 */
+function todoList(it){
+  const m=merged(it).proposed;
+  const ga=m.ga||{};
+  return [
+    ['사진', !!m.thumb],
+    ['원료', (m.ingredients||[]).length>0],
+    ['성분표', ['protein','fat','fiber','moisture'].every(k=>ga[k]!=null), '수분 등'],
+    ['가격', m.price?.p>0&&m.price?.wg>0],
+    ['판매 용량', (m.price?.wgOptions||[]).length>0],
+    ['구매 링크', !!m.price?.buyUrl]
+  ];
+}
+const todoLeft=it=>todoList(it).filter(([,ok])=>!ok).length;
+function todoHtml(it){
+  return `<div class="todo">${todoList(it).map(([l,ok])=>
+    `<span class="${ok?'ok':'no'}">${ok?'✓':'○'} ${esc(l)}</span>`).join('')}</div>`;
+}
+
+/* ── ⑤ 소비자에게 보이는 문구 ──
+   사료 관리에서 발행 뒤에 다시 고치던 것을 여기서 끝낸다.
+   손대기 전에는 엔진이 사실에서 만든 문구(자동)를 보여 주고, 하나라도 고치면
+   그 사료의 문구는 '직접 고침' 으로 굳는다. 자동으로 돌리려면 버튼을 누른다. */
+function curVerdict(it){return edits[it.stagingId]?.verdict ?? record(it).detail?.verdict ?? {pos:[],cau:[],dan:[]};}
+function curFit(it){
+  const e=edits[it.stagingId]?.fit; if(e)return e;
+  const d=record(it).detail||{}; return {fit:d.fit||[],fitCaution:d.fitCaution||[]};
+}
+function consumerBlock(it){
+  const id=it.stagingId, e=edits[id]||{};
+  const v=curVerdict(it), F=curFit(it);
+  const rows=[];
+  for(const kind of ['pos','cau','dan'])(v[kind]||[]).forEach((c,i)=>rows.push(`
+    <div class="vrow" data-vrow="${kind}:${i}">
+      <div class="top2">
+        <select data-vkind>${Object.entries(KIND_KO).map(([k,l])=>`<option value="${k}"${k===kind?' selected':''}>${l}</option>`).join('')}</select>
+        <button class="mini del" data-vdel>삭제</button>
+      </div>
+      <input data-vtitle value="${esc(c.title??'')}" placeholder="한 줄 제목">
+      <textarea data-vbody placeholder="왜 그런지 한두 문장">${esc(c.body??'')}</textarea>
+    </div>`));
+  const chips=(key,list)=>{
+    const on=new Set(list.map(x=>x.concernType));
+    return `<div class="chips">${Object.entries(PHRASES.concerns||{}).map(([k,c])=>
+      `<button class="chip ${on.has(k)?'on':''}" data-fitchip="${key}:${k}">${esc(c.label)}</button>`).join('')}</div>`+
+      list.map((x,i)=>`<div class="fitrow"><span class="k">${esc(concernKo(x.concernType))}</span>
+        <input data-fitlabel="${key}:${i}" value="${esc(x.label??'')}" placeholder="왜 맞는지(주의인지) 한 줄"></div>`).join('');
+  };
+  return `<section class="blk cons"><h3>⑤ 소비자에게 보이는 문구 <span class="hint">오른쪽 미리보기 그대로 올라가요</span></h3>
+    <div class="vtools">
+      <span class="state ${e.verdict?'mine':''}">${e.verdict?'직접 고침':'자동'}</span>
+      <select data-vtpl><option value="">+ 문장 추가 (템플릿에서)</option>
+        ${(PHRASES.verdict||[]).map((t,i)=>`<option value="${i}">${esc(KIND_KO[t.kind]||t.kind)} · ${esc(t.title)}</option>`).join('')}</select>
+      <button class="mini" data-vblank>+ 빈 문장</button>
+      ${e.verdict?`<button class="mini" data-vauto>자동 문구로 되돌리기</button>`:''}
+    </div>
+    ${rows.join('')||'<div class="pv-empty">문장이 없어요. 템플릿에서 추가하세요.</div>'}
+    ${e.verdict?`<div class="pv-note" style="margin-bottom:6px">직접 고친 문구는 성분·가격을 바꿔도 자동으로 안 바뀌어요. 숫자를 바꿨다면 문장 속 숫자도 확인하거나 <b>자동 문구로 되돌리기</b>를 누르세요.</div>`:''}
+    <div class="subh good">이런 아이에게 좋아요 <span class="state ${e.fit?'mine':''}">${e.fit?'직접 고침':'자동'}</span>
+      ${e.fit?`<button class="mini" data-fitauto style="margin-left:6px">자동으로 되돌리기</button>`:''}</div>
+    ${chips('fit',F.fit||[])}
+    <div class="subh warn">이런 아이는 주의해요</div>
+    ${chips('fitCaution',F.fitCaution||[])}
+  </section>`;
+}
+
+/* ── 프론트 미리보기 ── 사이트의 목록 카드 + 상세(성분 분석 탭) 요약 */
+function stars(n){return n==null?'<i class="na">가격 넣으면 계산</i>':`<i>${'★'.repeat(n)}${'☆'.repeat(5-n)}</i>`;}
+function previewHtml(it){
+  const {food:f,detail:d}=record(it);
+  /* 가성비가 비면 총점도 없다(가격 대기) — 엔진은 있는 별점만으로 계산해 버리므로 여기서 막는다 */
+  if(['quality','carb','additive','value'].some(k=>f.ratings?.[k]==null))f.score=null;
+  const n=d?.nutrient||{}, r=f.ratings||{};
+  const thumb=/^https?:/.test(f.thumb||'')?`<img src="${esc(f.thumb)}" alt="" onerror="this.outerHTML='<div class=ph>${esc((f.brand||'?')[0])}</div>'">`
+    :`<div class="ph">${esc((f.brand||'?')[0])}</div>`;
+  const pKg=f.price?.pKg;
+  const v=d?.verdict||{};
+  const cards=[...(v.pos||[]).map(x=>['pos',x]),...(v.cau||[]).map(x=>['cau',x]),...(v.dan||[]).map(x=>['cau',x])];
+  const shown=cards.slice(0,5);
+  const fit=(d?.fit||[]).filter(x=>String(x.label||'').trim()), care=(d?.fitCaution||[]).filter(x=>String(x.label||'').trim());
+  const val=(x,u='%')=>x!=null?`<b>${esc(x)}${u}</b>`:'<b class="na">비어 있음</b>';
+  const note=f.specOrigin==='overseas'
+    ? `<div class="pv-note">※ ${esc(f.specNote||`${f.brand} 글로벌에서 제시되는 기본 정보로서, 국내 사료관리법에 따른 제품 표시사항과 일부 다를 수 있습니다.`)}</div>`:'';
+  return `<div class="pv">
+    <div class="pv-h"><span>프론트 미리보기</span><span>${f.score!=null?'발행하면 이대로 보여요':'총점은 가격을 넣으면 나와요'}</span></div>
+    <div class="pv-sec"><div class="pv-k">목록 카드</div>
+      <div class="pv-card">${thumb}
+        <div style="min-width:0"><div class="pv-brand">${esc(f.brand)}</div><div class="pv-name">${esc(f.name)}</div></div>
+        <div class="pv-score"><b>${f.score??'—'}</b><span>총점</span></div></div>
+      <div class="pv-stars">
+        <div>원료 ${stars(r.quality)}</div><div>탄수화물 ${stars(r.carb)}</div>
+        <div>첨가물 ${stars(r.additive)}</div><div>가성비 ${stars(r.value)}</div></div>
+      <div class="pv-price">${pKg?`<b>100g당 ${Math.round(pKg/10).toLocaleString('ko-KR')}원</b> · ${won(f.price?.p)} / ${f.price?.wg}g`:'가격 없음'}</div>
+      <span class="pv-tag ${f.specOrigin==='overseas'?'ovs':'dom'}">${f.specOrigin==='overseas'?'해외 성분표 기준':'국내 기준'}</span>
+    </div>
+    <div class="pv-sec"><div class="pv-k">상세 · 기본 정보</div>
+      <div class="pv-grid">
+        <div><span>분류</span><b>${f.rx?'처방식':'일반식'}</b></div>
+        <div><span>단백질 · 지방</span>${n.protein!=null||n.fat!=null?`<b>${n.protein??'—'}% · ${n.fat??'—'}%</b>`:'<b class="na">비어 있음</b>'}</div>
+        <div><span>탄수화물 (추정)</span>${val(n.dmCarb)}</div>
+        <div><span>조섬유</span>${val(n.fiber)}</div>
+        <div><span>수분</span>${val(n.moisture)}</div>
+        <div><span>열량</span>${n.calKg!=null?`<b>${esc(n.calKg)} kcal/kg</b>`:'<b class="na">비어 있음</b>'}</div>
+      </div>${note}
+    </div>
+    <div class="pv-sec"><div class="pv-k">상세 · 좋은 점 · 주의할 점</div>
+      ${shown.map(([k,x])=>`<div class="pv-v"><span class="ic ${k}">${k==='pos'?'✓':'!'}</span>
+        <div><b>${esc(x.title||'')}</b><span>${esc(x.body||'')}</span></div></div>`).join('')||'<div class="pv-empty">문구가 없어요</div>'}
+      ${cards.length>5?`<div class="pv-more">+${cards.length-5}개는 사이트에 안 보여요 (앞의 5개만 나와요)</div>`:''}
+    </div>
+    <div class="pv-sec"><div class="pv-k">상세 · 이런 아이에게 어떨까요</div>
+      ${fit.map(x=>`<div class="pv-fit">✓ <b>${esc(concernKo(x.concernType))}</b> — ${esc(x.label)}</div>`).join('')}
+      ${care.map(x=>`<div class="pv-fit">! <b>${esc(concernKo(x.concernType))}</b> — ${esc(x.label)}</div>`).join('')}
+      ${fit.length||care.length?'':'<div class="pv-empty">표시할 문구가 없어요</div>'}
+    </div>
+  </div>`;
+}
+
 function pubLabel(G,ed){
   if(G.ready)return G.overridden?'책임 승인으로 발행':(ed?'고쳐서 발행':'발행');
   return G.draft?'자료 수집 중':'게이트 미통과';
@@ -684,21 +897,27 @@ function card(it){
     it.draft ? ''
       : g.g2==='사람'
         ? `<span class="b wa">사람 입력 · 라벨 판독</span>`
-        : `<span class="b ${g.g2==='match'?'ok':'no'}">게이트2 ${g.g2==='match'?'일치':'불일치'}</span>`,
+        : g.g2==='none'||!g.g2
+          ? `<span class="b">AI 재조사 없음</span>`
+          : `<span class="b ${g.g2==='match'?'ok':'no'}">게이트2 ${g.g2==='match'?'일치':'불일치'}</span>`,
     g.g3warn.length?`<span class="b wa">게이트3 경고 ${g.g3warn.length}</span>`:`<span class="b ok">게이트3 정상</span>`,
     isEdited(it)?`<span class="b ed">수정됨</span>`:''
   ].join('');
   const p=it.proposed||{};
+  const mt=merged(it).proposed.thumb;
+  const left=todoLeft(it);
   return `<div class="card ${it.ready?'':'blocked'} ${isEdited(it)?'edited':''}" data-id="${esc(it.stagingId)}">
     <div class="hd">
       <span class="chev">▸</span>
+      ${mt?`<img class="thumb" src="${esc(mt)}" alt="">`:`<span class="thumb none">${esc((p.brand||'?')[0])}</span>`}
       <div class="t">
         <b>${esc(it.label)}</b>
-        <div class="sub">${esc(p.type||'')} · ${it.pricePending?'가격 미확보':`${won(p.price?.p)} / ${p.price?.wg??'—'}g`} · ${p.score??'—'}점</div>
-        <div class="badges">${badges}</div>
+        <div class="sub">${esc(TYPE_KO[p.type]||p.type||'')} · ${it.pricePending?'가격 미확보':`${won(p.price?.p)} / ${p.price?.wg??'—'}g`} · ${p.score??'—'}점</div>
+        <div class="badges">${badges}<span class="b left b-left"${left?'':' hidden'}>남은 일 ${left}</span></div>
       </div>
     </div>
     <div class="body">
+      <div class="todoslot">${todoHtml(it)}</div>
       <div class="gatemsg">
       ${G.draft?`<div class="msg w"><b>자료 수집 중</b> — 카탈로그에서 기본 정보만 가져온 상태예요.
          아래 <b>라벨 붙여넣기</b>에 라벨을 넣으면 채점이 돌아갑니다.<br>${
@@ -709,11 +928,14 @@ function card(it){
       </div>
       <div class="ovrbox">${overrideBox(it,G)}</div>
       ${g.g3warn.map(w=>`<div class="msg w">⚠ ${esc(w)}</div>`).join('')}
+      <div class="cols"><div class="lcol">
       ${editBlock(it)}
+      <div class="consslot">${consumerBlock(it)}</div>
       <section class="blk"><h3>④ 출처 · 근거 <span class="hint">필요할 때 열어 보세요</span></h3>
         ${sourceBlock(it)}
         ${G.draft?'':`<details class="more"><summary>수집 AI · 심사 AI 대조표 보기</summary>${auditTable(it)}</details>`}
       </section>
+      </div><aside class="rcol"><div class="pvslot">${previewHtml(it)}</div></aside></div>
     </div>
     <div class="act">
       <button data-act="reject">반려</button>
@@ -734,11 +956,8 @@ function render(){
   }
   wrap.innerHTML=`
     <div class="note">
-      출처 링크를 직접 열어 값이 맞는지 확인한 뒤 판단하세요.
-      값이 틀렸으면 카드 안 <b>고치기</b>에서 바로 바꿀 수 있습니다 — 별점과 총점은 루브릭으로 다시 계산됩니다.
-      결정을 마치면 아래 <b>GitHub 에 발행</b>을 누릅니다 — 그 자리에서 data.js 에 병합해 커밋하고,
-      몇 분 뒤 사이트에 반영됩니다. 게이트에 막힌 건은 카드 안 <b>대표 확인 후 승인</b>에서 이유를 하나씩 확인하고 승인하면 발행할 수 있습니다.
-      (<b>명령만 복사</b>는 예전 방식으로, 터미널에서 처리할 때만 씁니다.)
+      카드를 열면 <b>왼쪽에서 채우고, 오른쪽 미리보기</b>로 사이트에 어떻게 보일지 확인하세요.
+      맨 위 동그라미(○)가 남은 일이에요. 다 채우고 <b>발행</b>을 고른 뒤 아래 <b>GitHub 에 발행</b>을 누르면 몇 분 뒤 사이트에 올라갑니다.
     </div>
     <div class="stat">
       <div><b>${s.total}</b><span>전체</span></div>
@@ -825,6 +1044,8 @@ function patchCard(id){
     pill('총점',d.score,o.score,'score')
   ].join('');
 
+  refreshSide(el,it);
+
   /* 라벨을 채웠으면 게이트를 그 값으로 다시 돌린 결과가 진짜다.
      안 그러면 다 채워 놓고도 '게이트 미통과' 로 막혀 발행이 안 된다 — 실제로 그랬다. */
   const g=gateNow(it);
@@ -860,6 +1081,79 @@ function patchCard(id){
       g.ready?'게이트1 통과':'게이트1 탈락';
   }
 }
+
+/* 미리보기·남은 일·소비자 문구(자동일 때)를 지금 값으로 다시 그린다.
+   쓰고 있는 칸이 있는 구역은 건드리지 않는다 — 쓰던 글이 날아간다. */
+function refreshSide(el,it){
+  const pv=el.querySelector('.pvslot'); if(pv)pv.innerHTML=previewHtml(it);
+  const td=el.querySelector('.todoslot'); if(td)td.innerHTML=todoHtml(it);
+  const lb=el.querySelector('.b-left'); if(lb){const n=todoLeft(it);lb.hidden=!n;lb.textContent='남은 일 '+n;}
+  const cs=el.querySelector('.consslot'); if(cs&&!cs.contains(document.activeElement))cs.innerHTML=consumerBlock(it);
+  const th=el.querySelector('.hd .thumb'); const mt=merged(it).proposed.thumb;
+  if(th&&mt&&th.tagName==='IMG'&&th.getAttribute('src')!==mt)th.src=mt;
+}
+
+/* ── ⑤ 문구 고치기 ── 처음 손댈 때 자동 문구를 복사해 '직접 고침' 으로 바꾼다 */
+function ownVerdict(id){const e=edits[id]||(edits[id]={});return e.verdict??=clone(curVerdict(itemById(id)));}
+function ownFit(id){const e=edits[id]||(edits[id]={});return e.fit??=clone(curFit(itemById(id)));}
+function consChanged(id,full){
+  saveEdits();
+  const el=document.querySelector(`.card[data-id="${CSS.escape(id)}"]`), it=itemById(id);
+  if(full){const cs=el.querySelector('.consslot'); cs.innerHTML=consumerBlock(it);}
+  patchCard(id); updateBar();
+}
+document.addEventListener('input',e=>{
+  const t=e.target, row=t.closest('[data-vrow]');
+  if(row&&(t.matches('[data-vtitle]')||t.matches('[data-vbody]'))){
+    const id=t.closest('.card').dataset.id, [kind,i]=row.dataset.vrow.split(':');
+    const c=ownVerdict(id)[kind][+i]; if(!c)return;
+    c[t.matches('[data-vtitle]')?'title':'body']=t.value;
+    consChanged(id,false); return;
+  }
+  if(t.matches('[data-fitlabel]')){
+    const id=t.closest('.card').dataset.id, [key,i]=t.dataset.fitlabel.split(':');
+    const x=ownFit(id)[key][+i]; if(x){x.label=t.value; consChanged(id,false);}
+  }
+});
+document.addEventListener('change',e=>{
+  const t=e.target;
+  if(t.matches('[data-vkind]')){
+    const id=t.closest('.card').dataset.id, [kind,i]=t.closest('[data-vrow]').dataset.vrow.split(':');
+    const v=ownVerdict(id); const [c]=v[kind].splice(+i,1); (v[t.value]??=[]).push(c);
+    consChanged(id,true); return;
+  }
+  if(t.matches('[data-vtpl]')&&t.value!==''){
+    const id=t.closest('.card').dataset.id, it=itemById(id), d=record(it).detail||{};
+    const tp=PHRASES.verdict[+t.value];
+    const vars=ENGINE.phraseVars({nutrient:d.nutrient,ingr:d.ingr,price:merged(it).proposed.price});
+    (ownVerdict(id)[tp.kind]??=[]).push({icon:tp.icon,category:tp.id,
+      title:ENGINE.fillPhrase(tp.title,vars),body:ENGINE.fillPhrase(tp.body,vars)});
+    consChanged(id,true);
+  }
+});
+document.addEventListener('click',e=>{
+  const t=e.target, card=t.closest('.card'); if(!card)return;
+  const id=card.dataset.id;
+  if(t.matches('[data-vdel]')){
+    const [kind,i]=t.closest('[data-vrow]').dataset.vrow.split(':');
+    ownVerdict(id)[kind].splice(+i,1); consChanged(id,true); return;
+  }
+  if(t.matches('[data-vblank]')){(ownVerdict(id).pos??=[]).push({icon:'✅',category:'custom',title:'',body:''});consChanged(id,true);return;}
+  if(t.matches('[data-vauto]')){if(!confirm('고친 문구를 지우고 자동 문구로 되돌릴까요?'))return;
+    delete edits[id].verdict; if(!Object.keys(edits[id]).length)delete edits[id]; consChanged(id,true); return;}
+  if(t.matches('[data-fitauto]')){delete edits[id].fit; if(!Object.keys(edits[id]).length)delete edits[id]; consChanged(id,true); return;}
+  if(t.matches('[data-fitchip]')){
+    const [key,c]=t.dataset.fitchip.split(':'), F=ownFit(id), list=F[key]??=[];
+    const at=list.findIndex(x=>x.concernType===c);
+    if(at>=0)list.splice(at,1);
+    else{
+      const it=itemById(id), d=record(it).detail||{};
+      const tpl=PHRASES.concerns[c]?.[key==='fit'?'fit':'caution']??'';
+      list.push({concernType:c,label:ENGINE.fillPhrase(tpl,ENGINE.phraseVars({nutrient:d.nutrient,ingr:d.ingr,price:merged(it).proposed.price}))});
+    }
+    consChanged(id,true);
+  }
+});
 
 /* 값이 원본과 같아지면 수정 기록에서 지운다 — 안 고친 것으로 되돌아간다 */
 function setEdit(id,path,raw){

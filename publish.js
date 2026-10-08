@@ -62,6 +62,28 @@ const PUB = {
     lines[i] = head + JSON.stringify(mutate(value)) + ';';
   },
 
+  /* 발행될 모양 그대로 — 사료 카드(food)와 상세(detail).
+     심사 화면의 '프론트 미리보기' 와 실제 발행이 같은 함수를 쓴다. 따로 만들면
+     미리보기에서 본 문장과 사이트에 올라간 문장이 달라진다.
+     edit.verdict(좋은 점·주의할 점) · edit.fit(이런 아이에게) 는 심사자가 고친 문구다.
+     없으면 엔진이 사실에서 만든 문구를 그대로 쓴다. */
+  finalize(item, edit, uuid, now) {
+    const { food, detail } = ENGINE.publishRecord(item, uuid, now);
+    if (detail) {
+      if (edit?.verdict) detail.verdict = JSON.parse(JSON.stringify(edit.verdict));
+      if (edit?.fit) {
+        detail.fit = JSON.parse(JSON.stringify(edit.fit.fit || []));
+        detail.fitCaution = JSON.parse(JSON.stringify(edit.fit.fitCaution || []));
+      }
+      /* 사료 관리 화면과 같은 규칙 — '이런 아이에게 좋아요' 에 고른 고민이 곧 concerns 다.
+         비워 두면 고민별 찾기에서 이 사료가 안 나온다. */
+      const ok = new Set(POLICY.ENUM?.concerns || []);
+      const c = [...new Set((detail.fit || []).map(x => x.concernType))].filter(k => !ok.size || ok.has(k)).sort();
+      if (c.length || edit?.fit) food.concerns = c;
+    }
+    return { food, detail };
+  },
+
   /* 사람이 고친 값을 발행 직전에 반영한다.
      별점과 총점은 여기서 다시 계산한다 — 사람이 점수를 직접 쓰는 경로는 없다. */
   applyEdits(item, edit) {
@@ -271,7 +293,7 @@ const PUB = {
           keep.push(raw);
           continue;
         }
-        const { food, detail } = ENGINE.publishRecord(item, newId(), now);
+        const { food, detail } = this.finalize(item, edits[id], newId(), now);
         /* 해외 정보 안내문은 대표가 직접 쓴 문구가 있을 때만 싣는다. 비어 있으면
            프론트가 브랜드 이름으로 기본 문구를 만든다. */
         if (item.proposed.specNote) food.specNote = item.proposed.specNote;
