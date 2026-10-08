@@ -559,7 +559,9 @@ const kindLabel = r => r.engine ? `검색 · ${r.engine}` : kindName(r.kind);
    서버가 없어서 비밀 키를 둘 곳이 없다 — OAuth 클라이언트 ID 는 원래 공개되는 값이고,
    받은 접근 토큰은 이 탭(sessionStorage)에만 1시간 둔다. 네이버는 이런 API 가 없다. */
 const GSC_CID = 'balsatang.gsc.cid', GSC_SITE = 'balsatang.gsc.site', GSC_TOK = 'balsatang.gsc.tok';
-const gscCid = () => ls.get(GSC_CID) || '';
+/* 대표님이 만든 OAuth 클라이언트 ID — 공개 값이라 여기 둔다. 기기마다 붙여 넣지 않게. 연결 설정에서 바꿀 수 있다. */
+const GSC_DEFAULT_CID = '774539790108-4ekpj7n16vt7iv8uo17jckonbc0eomeu.apps.googleusercontent.com';
+const gscCid = () => ls.get(GSC_CID) || GSC_DEFAULT_CID;
 function gscTok() {
   try { const t = JSON.parse(sessionStorage.getItem(GSC_TOK) || 'null'); return t && Date.now() < t.exp - 60000 ? t.v : null; } catch { return null; }
 }
