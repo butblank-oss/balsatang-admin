@@ -33,6 +33,22 @@
 
 **service_role 키는 어디에도 넣지 않는다.**
 
+## 업데이트 (2026-10 · 사람/봇 구분 · 세션별 보기)
+
+`schema.sql` 을 SQL Editor 에 **다시 한 번 통째로** 붙여 넣고 실행한다. 기존 기록은 그대로 남는다.
+새로 생기는 것:
+
+- `analytics_dashboard(p_from, p_to, p_who)` — `p_who` 로 `human`(기본)·`bot`·`all` 을 고른다
+- `analytics_traffic` — 유입 종류(검색·유튜브·블로그·SNS·AI…)와 봇 종류를 사람/봇 나란히
+- `analytics_sessions` — 방문 한 번마다 한 줄
+
+사람/봇은 프론트 `track.js` 가 `session_start` 의 `props.agent` 에 적는다
+(`human` · `crawler` 검색 로봇 · `automation` 헤드리스 브라우저). 그 값이 없는 예전 기록은
+'리눅스 데스크톱인데 화면 폭 480 이하' 를 자동 점검으로 추정한다.
+curl·API 처럼 JS 를 실행하지 않는 수집은 이 기록에 남지 않는다.
+
+실행 전에 어드민을 열면 '사용 분석' 위에 **DB 업데이트가 한 번 필요해요** 가 뜨고, 숫자에는 봇이 섞여 나온다.
+
 ## 쌓이는 이벤트
 
 | 이벤트 | 언제 | 주요 값 |
