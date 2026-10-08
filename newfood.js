@@ -263,7 +263,7 @@ const NEWFOOD = {
   },
 
   async submit() {
-    if (!GH.token) { toast('먼저 토큰을 넣어주세요'); return; }
+    if (!GH.token) { toast('이 브라우저엔 아직 토큰이 없어요 — 넣는 창을 열게요'); GH.ask(() => document.getElementById('tokenBtn')?.click()); return; }
     const d = this.derive();
     const errs = this.validate(d);
     if (errs.length) { toast(errs[0]); return; }
