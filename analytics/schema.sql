@@ -430,7 +430,123 @@ revoke all on function public.analytics_sessions(date, date, text, int, int) fro
 grant execute on function public.analytics_sessions(date, date, text, int, int) to authenticated;
 
 -- ══════════════════════════════════════════════════════════════
--- 7. 보관 기간 — 13개월 지난 기록은 지운다 (개인정보처리방침과 같은 숫자)
+-- 7. 여정 · 이탈 — 어떤 길로 다니다 어디서 왜 떠났나
+--    한 세션의 화면 순서(같은 화면 연속은 하나로), 마지막 화면, 이탈 이유(규칙으로 추정),
+--    검색어가 어디서 나와 어떻게 끝났는지. 이유는 '추정' 이다 — 진짜 이유는 묻지 않으면 모른다.
+--    leave 이벤트(화면을 떠날 때·앱을 내릴 때, 2026-10 부터)가 있으면 마지막 화면에 머문 시간까지 센다.
+-- ══════════════════════════════════════════════════════════════
+create or replace function public.analytics_journey(p_from date, p_to date, p_who text default 'human')
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare
+  t0 timestamptz := (p_from::timestamp at time zone 'Asia/Seoul');
+  t1 timestamptz := ((p_to + 1)::timestamp at time zone 'Asia/Seoul');
+  out jsonb;
+begin
+  if not public.is_analytics_admin() then
+    raise exception 'not an analytics admin' using errcode = '42501';
+  end if;
+  with
+  cls as (select * from analytics_cls(t0, t1)),
+  ev as (select e.* from events e join cls c using (session_id)
+         where e.ts >= t0 and e.ts < t1 and (p_who = 'all' or c.who = p_who)),
+  sv as (
+    select session_id, ts, props->>'screen' as s,
+      lag(props->>'screen') over (partition by session_id order by ts, id) as ps
+    from ev where name = 'screen_view'
+  ),
+  steps as (
+    select session_id, array_agg(s order by ts) filter (where ps is distinct from s) as seq
+    from sv group by session_id
+  ),
+  sess as (
+    select session_id,
+      min(ts) as started, max(ts) as ended,
+      bool_or(name = 'buy_click') as bought,
+      bool_or(name = 'js_error') as err,
+      bool_or(name = 'pet_profile_saved') as prof,
+      bool_or(name = 'screen_view' and props->>'screen' = 'wizard') as wiz,
+      count(*) filter (where name = 'screen_view') as screens,
+      bool_or(name = 'leave') as has_leave,
+      (array_agg(props->>'screen' order by ts desc, id desc) filter (where name = 'screen_view'))[1] as last_screen,
+      (array_agg(props->>'id' order by ts desc, id desc) filter (where name = 'screen_view'))[1] as last_id,
+      (array_agg(case when props->>'n' ~ '^\d+$' then (props->>'n')::int end order by ts desc, id desc) filter (where name = 'search'))[1] as last_search_n,
+      max(ts) filter (where name = 'search') as last_search_ts,
+      max(ts) filter (where name = 'screen_view' and props->>'screen' = 'detail') as last_detail_ts,
+      (array_agg(traffic_kind(ref, utm_source, browser) order by name <> 'session_start', ts))[1] as kind,
+      (array_agg(traffic_source(ref, utm_source, browser) order by name <> 'session_start', ts))[1] as source
+    from ev group by session_id
+  ),
+  judged as (
+    select s.*, st.seq, extract(epoch from (s.ended - s.started)) as sec,
+      case
+        when s.bought then 'bought'
+        when s.err then 'error'
+        when s.last_search_ts is not null and s.last_search_n = 0
+             and (s.last_detail_ts is null or s.last_detail_ts < s.last_search_ts) then 'zero_search'
+        when s.wiz and not s.prof then 'wizard_drop'
+        when coalesce(array_length(st.seq, 1), 0) <= 1 and extract(epoch from (s.ended - s.started)) < 10 then 'bounce'
+        when s.last_screen = 'detail' then 'detail_exit'
+        when s.last_screen = 'search' then 'search_exit'
+        when extract(epoch from (s.ended - s.started)) >= 120 then 'long_read'
+        else 'browse' end as reason
+    from sess s left join steps st using (session_id)
+  ),
+  paths as (
+    select kind, seq[1:5] as path, coalesce(array_length(seq, 1), 0) > 5 as more,
+      count(*) as sessions, count(*) filter (where bought) as bought,
+      round(avg(sec)::numeric) as avg_sec
+    from judged where seq is not null group by 1, 2, 3 order by 4 desc limit 25
+  ),
+  seen as (select distinct session_id, s from sv),
+  exit_by as (
+    select v.s as screen, count(distinct v.session_id) as sessions,
+      count(distinct v.session_id) filter (where j.last_screen = v.s) as exits,
+      count(distinct v.session_id) filter (where j.last_screen = v.s and j.bought) as exits_bought
+    from seen v join judged j using (session_id) group by 1 order by 2 desc
+  ),
+  reasons as (
+    select reason, case when reason = 'detail_exit' then last_id end as food,
+      count(*) as sessions, round(avg(sec)::numeric) as avg_sec
+    from judged group by 1, 2 order by 3 desc
+  ),
+  srch as (
+    select e.session_id, e.ts, lower(e.props->>'q') as q,
+      case when e.props->>'n' ~ '^\d+$' then (e.props->>'n')::int end as n,
+      (select v.props->>'prev' from ev v where v.session_id = e.session_id and v.name = 'screen_view'
+         and v.props->>'screen' = 'search' and v.ts <= e.ts order by v.ts desc limit 1) as src,
+      case
+        when exists (select 1 from ev v where v.session_id = e.session_id and v.ts > e.ts
+                     and v.name = 'screen_view' and v.props->>'screen' = 'detail') then 'detail'
+        when not exists (select 1 from ev v where v.session_id = e.session_id and v.ts > e.ts
+                     and v.name not in ('leave', 'search')) then 'left'
+        else 'other' end as outcome
+    from ev e where e.name = 'search'
+  ),
+  searches as (
+    select q, max(n) as n, coalesce(src, '(바로 검색)') as src, outcome, count(*) as times, count(distinct session_id) as sessions
+    from srch group by q, coalesce(src, '(바로 검색)'), outcome order by 5 desc limit 300
+  ),
+  articles as (
+    select props->>'id' as id, count(*) as views, count(distinct session_id) as sessions
+    from ev where name = 'screen_view' and props->>'screen' = 'article' and props->>'id' is not null
+    group by 1 order by 2 desc limit 30
+  )
+  select jsonb_build_object(
+    'total',    (select count(*) from judged),
+    'leaveOn',  (select bool_or(has_leave) from judged),
+    'paths',    coalesce((select jsonb_agg(paths) from paths), '[]'),
+    'exits',    coalesce((select jsonb_agg(exit_by) from exit_by), '[]'),
+    'reasons',  coalesce((select jsonb_agg(reasons) from reasons), '[]'),
+    'searches', coalesce((select jsonb_agg(searches) from searches), '[]'),
+    'articles', coalesce((select jsonb_agg(articles) from articles), '[]')
+  ) into out;
+  return out;
+end $$;
+revoke all on function public.analytics_journey(date, date, text) from public, anon;
+grant execute on function public.analytics_journey(date, date, text) to authenticated;
+
+-- ══════════════════════════════════════════════════════════════
+-- 8. 보관 기간 — 13개월 지난 기록은 지운다 (개인정보처리방침과 같은 숫자)
 -- ══════════════════════════════════════════════════════════════
 create or replace function public.analytics_purge() returns int
 language sql security definer set search_path = public as $$
