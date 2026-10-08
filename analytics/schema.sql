@@ -82,9 +82,69 @@ create policy admins_self on public.analytics_admins for select to authenticated
   using (user_id = auth.uid());
 
 -- ══════════════════════════════════════════════════════════════
--- 3. 대시보드 — 기간을 받아 화면에 필요한 숫자를 한 번에 돌려준다
+-- 3. 사람/봇 · 유입 종류 — 대시보드·세션·유입 함수가 같이 쓴다
 -- ══════════════════════════════════════════════════════════════
-create or replace function public.analytics_dashboard(p_from date, p_to date)
+-- 세션마다 사람인지 봇인지. 프론트 track.js 가 session_start·first_visit 의 props.agent 에
+--   human | crawler(검색 로봇 등) | automation(헤드리스 브라우저·자동화 도구) 를 적는다.
+-- 그 값이 없는 예전 기록은, 리눅스 데스크톱인데 화면 폭이 480 이하인 것(=헤드리스로 띄운
+-- 모바일 화면, 개발 중 자동 점검)을 봇으로 추정한다. 실제 사람이 그렇게 쓰는 일은 드물다.
+create or replace function public.analytics_cls(p_lo timestamptz, p_hi timestamptz)
+returns table(session_id text, who text, bot text)
+language sql stable security definer set search_path = public as $$
+  with s as (
+    select e.session_id,
+      max(e.props->>'agent') filter (where e.name in ('session_start', 'first_visit')) as ag,
+      max(e.props->>'bot')   filter (where e.name in ('session_start', 'first_visit')) as bt,
+      bool_or(e.os = 'linux' and e.device = 'desktop' and e.vw <= 480) as legacy
+    from events e where e.ts >= p_lo - interval '1 day' and e.ts < p_hi group by e.session_id
+  )
+  select s.session_id,
+    case when s.ag in ('crawler', 'automation') then 'bot'
+         when s.ag = 'human' then 'human'
+         when s.legacy then 'bot' else 'human' end,
+    case when s.ag in ('crawler', 'automation') then coalesce(s.bt, s.ag)
+         when s.ag is null and s.legacy then 'headless(추정)' end
+  from s
+$$;
+revoke all on function public.analytics_cls(timestamptz, timestamptz) from public, anon, authenticated;
+
+-- 들어온 곳 이름 — utm 이 있으면 그것, 없으면 앞 사이트 도메인, 그것도 없으면 인앱 브라우저.
+create or replace function public.traffic_source(p_ref text, p_utm text, p_browser text)
+returns text language sql immutable as $$
+  select coalesce(nullif(lower(p_utm), ''), nullif(lower(p_ref), ''),
+    case p_browser when 'kakaotalk' then '카카오톡 앱' when 'instagram' then '인스타그램 앱'
+                   when 'naver' then '네이버 앱' when 'facebook' then '페이스북 앱' end,
+    '(직접 방문)')
+$$;
+
+-- 들어온 곳 종류 — search(검색) · video(유튜브) · community(블로그·카페) · social · ai · messenger
+--                  · naver_app · shop · referral(그 밖의 사이트) · direct
+create or replace function public.traffic_kind(p_ref text, p_utm text, p_browser text)
+returns text language sql immutable as $$
+  select case
+    when v = '' then case p_browser when 'kakaotalk' then 'messenger' when 'instagram' then 'social'
+                                    when 'facebook' then 'social' when 'naver' then 'naver_app' else 'direct' end
+    when v ~ '(^|\.)(youtube\.com|youtu\.be)$' or v in ('youtube', 'yt') then 'video'
+    when v ~ '(^|\.)(blog|cafe|post|in|kin)\.naver\.com$' or v ~ '(tistory\.com|brunch\.co\.kr|velog\.io|cafe\.daum\.net)$'
+         or v in ('blog', 'naverblog', 'cafe', 'tistory') then 'community'
+    when v ~ '(chatgpt\.com|chat\.openai\.com|perplexity\.ai|claude\.ai|gemini\.google\.com|copilot\.microsoft\.com)$'
+         or v in ('chatgpt', 'perplexity', 'claude', 'gemini', 'copilot') then 'ai'
+    when v ~ '(^|\.)(google\.[a-z.]+|naver\.com|daum\.net|bing\.com|zum\.com|yahoo\.[a-z.]+|duckduckgo\.com|baidu\.com|ecosia\.org)$'
+         or v in ('google', 'naver', 'daum', 'bing', 'zum') then 'search'
+    when v ~ '(instagram\.com|facebook\.com|threads\.net|threads\.com|tiktok\.com|(^|\.)x\.com|(^|\.)t\.co|twitter\.com)$'
+         or v in ('instagram', 'ig', 'facebook', 'fb', 'threads', 'tiktok', 'x', 'twitter') then 'social'
+    when v ~ 'kakao' then 'messenger'
+    when v ~ '(coupang\.com|smartstore\.naver\.com)$' then 'shop'
+    else 'referral' end
+  from (select lower(coalesce(nullif(p_utm, ''), nullif(p_ref, ''), '')) as v) x
+$$;
+
+-- ══════════════════════════════════════════════════════════════
+-- 4. 대시보드 — 기간을 받아 화면에 필요한 숫자를 한 번에 돌려준다
+--    p_who: human(기본) | bot | all. 숫자는 고른 쪽만 센다.
+-- ══════════════════════════════════════════════════════════════
+drop function if exists public.analytics_dashboard(date, date);
+create or replace function public.analytics_dashboard(p_from date, p_to date, p_who text default 'human')
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare
   t0 timestamptz := (p_from::timestamp at time zone 'Asia/Seoul');
@@ -98,8 +158,13 @@ begin
   end if;
 
   with
-  ev  as (select * from events where ts >= t0 and ts < t1),
-  pev as (select * from events where ts >= q0 and ts < t0),
+  cls as (select * from analytics_cls(q0, t1)),
+  ev  as (select e.* from events e join cls c using (session_id)
+          where e.ts >= t0 and e.ts < t1 and (p_who = 'all' or c.who = p_who)),
+  pev as (select e.* from events e join cls c using (session_id)
+          where e.ts >= q0 and e.ts < t0 and (p_who = 'all' or c.who = p_who)),
+  whos as (select c.who, count(distinct e.session_id) as sessions, count(distinct e.device_id) as visitors
+           from events e join cls c using (session_id) where e.ts >= t0 and e.ts < t1 group by c.who),
   firsts as (select device_id, min(ts) as first_ts from events group by device_id),
   kpi_of as (
     select x.period,
@@ -129,12 +194,13 @@ begin
     from ev join firsts f using (device_id) group by 1 order by 1
   ),
   starts as (
-    select distinct on (session_id) session_id, device_id, ref, utm_source, utm_medium, utm_campaign, props->>'landing' as landing
+    select distinct on (session_id) session_id, device_id, ref, utm_source, utm_medium, utm_campaign, browser, props->>'landing' as landing
     from ev where name = 'session_start' order by session_id, ts
   ),
   sess_buy as (select distinct session_id from ev where name = 'buy_click'),
   sources as (
-    select coalesce(nullif(s.utm_source, ''), nullif(s.ref, ''), '(직접 방문)') as source,
+    select traffic_source(s.ref, s.utm_source, s.browser) as source,
+      min(traffic_kind(s.ref, s.utm_source, s.browser)) as kind,
       count(*) as sessions,
       count(distinct s.device_id) filter (where f.first_ts >= t0) as new_visitors,
       count(b.session_id) as buy_sessions
@@ -146,6 +212,11 @@ begin
       count(b.session_id) as buy_sessions
     from starts s left join sess_buy b using (session_id)
     where utm_campaign is not null group by 1,2,3 order by 4 desc limit 20
+  ),
+  kinds as (
+    select traffic_kind(s.ref, s.utm_source, s.browser) as kind, count(*) as sessions,
+      count(distinct s.device_id) as visitors, count(b.session_id) as buy_sessions
+    from starts s left join sess_buy b using (session_id) group by 1 order by 2 desc
   ),
   landings as (
     select split_part(coalesce(landing, '#/'), '?', 1) as landing, count(*) as sessions
@@ -234,7 +305,9 @@ begin
     from ev where name = 'js_error' group by 1, 2, 3 order by 4 desc limit 10
   )
   select jsonb_build_object(
-    'range',     jsonb_build_object('from', p_from, 'to', p_to, 'days', span),
+    'range',     jsonb_build_object('from', p_from, 'to', p_to, 'days', span, 'who', p_who),
+    'whos',      coalesce((select jsonb_agg(whos) from whos), '[]'),
+    'kinds',     coalesce((select jsonb_agg(kinds) from kinds), '[]'),
     'kpi',       (select jsonb_object_agg(period, to_jsonb(k) - 'period') from kpi_of k),
     'daily',     coalesce((select jsonb_agg(daily) from daily), '[]'),
     'sources',   coalesce((select jsonb_agg(sources) from sources), '[]'),
@@ -257,11 +330,107 @@ begin
   return out;
 end $$;
 
-revoke all on function public.analytics_dashboard(date, date) from public, anon;
-grant execute on function public.analytics_dashboard(date, date) to authenticated;
+revoke all on function public.analytics_dashboard(date, date, text) from public, anon;
+grant execute on function public.analytics_dashboard(date, date, text) to authenticated;
 
 -- ══════════════════════════════════════════════════════════════
--- 4. 보관 기간 — 13개월 지난 기록은 지운다 (개인정보처리방침과 같은 숫자)
+-- 5. 유입 — 사람과 봇을 나란히. 고르는 값 없이 둘 다 돌려준다.
+-- ══════════════════════════════════════════════════════════════
+create or replace function public.analytics_traffic(p_from date, p_to date)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare
+  t0 timestamptz := (p_from::timestamp at time zone 'Asia/Seoul');
+  t1 timestamptz := ((p_to + 1)::timestamp at time zone 'Asia/Seoul');
+  out jsonb;
+begin
+  if not public.is_analytics_admin() then
+    raise exception 'not an analytics admin' using errcode = '42501';
+  end if;
+  with
+  cls as (select * from analytics_cls(t0, t1)),
+  ev as (select e.*, c.who, c.bot from events e join cls c using (session_id) where e.ts >= t0 and e.ts < t1),
+  sess as (
+    select session_id, min(who) as who, min(bot) as bot, min(device_id) as device_id, min(ts) as started,
+      count(*) as events, bool_or(name = 'buy_click') as bought,
+      (array_agg(traffic_source(ref, utm_source, browser) order by name <> 'session_start', ts))[1] as source,
+      (array_agg(traffic_kind(ref, utm_source, browser) order by name <> 'session_start', ts))[1] as kind
+    from ev group by session_id
+  ),
+  summary as (select who, count(*) as sessions, count(distinct device_id) as visitors, sum(events) as events
+              from sess group by who),
+  kinds as (select who, kind, count(*) as sessions, count(distinct device_id) as visitors,
+              count(*) filter (where bought) as buy_sessions from sess group by 1, 2 order by 3 desc),
+  sources as (select who, kind, source, count(*) as sessions, count(distinct device_id) as visitors,
+                count(*) filter (where bought) as buy_sessions from sess group by 1, 2, 3 order by 4 desc limit 60),
+  bots as (select bot, count(*) as sessions, count(distinct device_id) as devices, sum(events) as events,
+             max(started) as last from sess where who = 'bot' group by 1 order by 2 desc),
+  daily as (select (started at time zone 'Asia/Seoul')::date as d,
+              count(*) filter (where who = 'human') as human, count(*) filter (where who = 'bot') as bot
+            from sess group by 1 order by 1)
+  select jsonb_build_object(
+    'summary', coalesce((select jsonb_agg(summary) from summary), '[]'),
+    'kinds',   coalesce((select jsonb_agg(kinds) from kinds), '[]'),
+    'sources', coalesce((select jsonb_agg(sources) from sources), '[]'),
+    'bots',    coalesce((select jsonb_agg(bots) from bots), '[]'),
+    'daily',   coalesce((select jsonb_agg(daily) from daily), '[]')
+  ) into out;
+  return out;
+end $$;
+revoke all on function public.analytics_traffic(date, date) from public, anon;
+grant execute on function public.analytics_traffic(date, date) to authenticated;
+
+-- ══════════════════════════════════════════════════════════════
+-- 6. 세션 목록 — 한 번 방문(30분 쉬면 새 방문)마다 한 줄. 최신 순.
+--    한 세션의 자세한 기록은 events 표를 session_id 로 바로 읽는다(운영자만 읽힘).
+-- ══════════════════════════════════════════════════════════════
+create or replace function public.analytics_sessions(p_from date, p_to date, p_who text default 'human',
+  p_limit int default 50, p_offset int default 0)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare
+  t0 timestamptz := (p_from::timestamp at time zone 'Asia/Seoul');
+  t1 timestamptz := ((p_to + 1)::timestamp at time zone 'Asia/Seoul');
+  out jsonb;
+begin
+  if not public.is_analytics_admin() then
+    raise exception 'not an analytics admin' using errcode = '42501';
+  end if;
+  with
+  cls as (select * from analytics_cls(t0, t1)),
+  ev as (select e.*, c.who, c.bot from events e join cls c using (session_id)
+         where e.ts >= t0 and e.ts < t1 and (p_who = 'all' or c.who = p_who)),
+  firsts as (select device_id, min(ts) as first_ts from events
+             where device_id in (select distinct device_id from ev) group by device_id),
+  sess as (
+    select ev.session_id, min(ev.who) as who, min(ev.bot) as bot, min(ev.device_id) as device_id,
+      min(ev.ts) as started, max(ev.ts) as ended, count(*) as events,
+      count(*) filter (where ev.name = 'screen_view') as screens,
+      count(distinct ev.props->>'id') filter (where ev.name = 'screen_view' and ev.props->>'screen' = 'detail') as foods,
+      count(*) filter (where ev.name = 'search') as searches,
+      count(*) filter (where ev.name = 'buy_click') as buys,
+      bool_or(ev.name = 'pet_profile_saved') as profile,
+      bool_or(ev.name = 'js_error') as error,
+      (array_agg(traffic_source(ev.ref, ev.utm_source, ev.browser) order by ev.name <> 'session_start', ev.ts))[1] as source,
+      (array_agg(traffic_kind(ev.ref, ev.utm_source, ev.browser) order by ev.name <> 'session_start', ev.ts))[1] as kind,
+      (array_agg(ev.props->>'landing' order by ev.ts) filter (where ev.name = 'session_start'))[1] as landing,
+      min(ev.device) as device, min(ev.os) as os, min(ev.browser) as browser
+    from ev group by ev.session_id
+  ),
+  page as (
+    select s.*, (f.first_ts >= s.started - interval '1 minute') as is_new
+    from sess s join firsts f using (device_id)
+    order by s.started desc limit greatest(1, least(p_limit, 200)) offset greatest(0, p_offset)
+  )
+  select jsonb_build_object(
+    'total', (select count(*) from sess),
+    'rows',  coalesce((select jsonb_agg(page order by page.started desc) from page), '[]')
+  ) into out;
+  return out;
+end $$;
+revoke all on function public.analytics_sessions(date, date, text, int, int) from public, anon;
+grant execute on function public.analytics_sessions(date, date, text, int, int) to authenticated;
+
+-- ══════════════════════════════════════════════════════════════
+-- 7. 보관 기간 — 13개월 지난 기록은 지운다 (개인정보처리방침과 같은 숫자)
 -- ══════════════════════════════════════════════════════════════
 create or replace function public.analytics_purge() returns int
 language sql security definer set search_path = public as $$

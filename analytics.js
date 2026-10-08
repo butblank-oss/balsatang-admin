@@ -64,7 +64,23 @@ async function api(path, opt = {}) {
   }
   return j;
 }
-const dashboard = (from, to) => api('/rest/v1/rpc/analytics_dashboard', { method: 'POST', body: JSON.stringify({ p_from: from, p_to: to }) });
+/* p_who 를 받는 새 함수(analytics/schema.sql 4~6번)가 아직 DB 에 없으면 PostgREST 가
+   'Could not find the function' 으로 거절한다. 그때는 예전 함수로 받고 화면에 'SQL 업데이트' 를 띄운다. */
+const missingFn = e => /Could not find the function|PGRST202|does not exist/i.test(e && e.message || '');
+let needSql = false;
+async function dashboard(from, to, who) {
+  try {
+    return await api('/rest/v1/rpc/analytics_dashboard', { method: 'POST', body: JSON.stringify({ p_from: from, p_to: to, p_who: who }) });
+  } catch (e) {
+    if (!missingFn(e)) throw e;
+    needSql = true;
+    return api('/rest/v1/rpc/analytics_dashboard', { method: 'POST', body: JSON.stringify({ p_from: from, p_to: to }) });
+  }
+}
+const traffic = (from, to) => api('/rest/v1/rpc/analytics_traffic', { method: 'POST', body: JSON.stringify({ p_from: from, p_to: to }) });
+const sessions = (from, to, who, limit, offset) => api('/rest/v1/rpc/analytics_sessions', { method: 'POST',
+  body: JSON.stringify({ p_from: from, p_to: to, p_who: who, p_limit: limit, p_offset: offset }) });
+const sessionEvents = sid => api(`/rest/v1/events?select=ts,name,props,screen,ref,utm_source,device,os,browser&session_id=eq.${encodeURIComponent(sid)}&order=id.asc&limit=500`);
 const recent = (n = 100) => api(`/rest/v1/events?select=ts,device_id,session_id,name,props,screen,ref,utm_source,device,os,browser&order=id.desc&limit=${n}`);
 
 /* ── 화면 ── */
@@ -97,6 +113,28 @@ function foodName(id) {
 }
 const screenName = s => SCREEN_KO[s] || s || '(알 수 없음)';
 
+/* ── 탭 ──
+   한 화면에 표 열여섯 개를 쌓았더니 무엇을 봐야 할지 몰랐다. 질문 단위로 나눈다.
+   대시보드(요즘 어때?) · 유입(어디서 왔어? 사람이야?) · 세션(한 사람은 뭘 했어?)
+   · 사료·검색(뭘 찾았어?) · 행동·오류(어디서 막혔어?) */
+const TABS = [['dash', '대시보드'], ['traffic', '유입 · 사람/봇'], ['sessions', '세션별'], ['foods', '사료 · 검색'], ['acts', '행동 · 오류']];
+const WHO = [['human', '사람만'], ['bot', '봇만'], ['all', '전체']];
+const KIND_KO = { search: '검색 (구글·네이버 등)', video: '유튜브', community: '블로그·카페', social: 'SNS', ai: 'AI 답변',
+  messenger: '카카오톡 등 메신저', naver_app: '네이버 앱', shop: '쇼핑몰', referral: '다른 사이트', direct: '직접 방문' };
+const BOT_KO = { googlebot: '구글 검색 로봇', naver: '네이버 검색 로봇 (Yeti)', daum: '다음 검색 로봇', bing: '빙 검색 로봇',
+  kakao: '카카오톡 링크 미리보기', facebook: '페이스북·메타 미리보기', twitter: 'X 링크 미리보기', apple: '애플 검색 로봇',
+  yandex: '얀덱스 로봇', baidu: '바이두 로봇', ai: 'AI 수집기 (GPT·Claude·Perplexity 등)', seo: 'SEO 분석 로봇',
+  other: '그 밖의 로봇', headless: '자동화 브라우저 (자동 점검·수집)', lighthouse: '성능 측정 도구',
+  'headless(추정)': '자동화 브라우저 (추정 · 예전 기록)', automation: '자동화 도구', crawler: '로봇' };
+const kindName = k => KIND_KO[k] || k || '—';
+const botName = b => BOT_KO[b] || b || '로봇';
+const whoTag = (who, bot) => who === 'bot'
+  ? `<span class="tag warn" title="${$esc(bot || '')}">봇 · ${$esc(botName(bot))}</span>` : '<span class="tag good">사람</span>';
+
+const st = { tab: 'dash', who: 'human', sess: [], sessTotal: 0, open: null };
+try { const s = JSON.parse(localStorage.getItem('balsatang.an.ui') || 'null'); if (s) { st.tab = s.tab || st.tab; st.who = s.who || st.who; } } catch { }
+const saveUi = () => { try { localStorage.setItem('balsatang.an.ui', JSON.stringify({ tab: st.tab, who: st.who })); } catch { } };
+
 let range = { days: 7 };
 let last = null;
 
@@ -106,22 +144,39 @@ function rangeDates() {
   return { from: kst(from), to: kst(to) };
 }
 
+const segBtn = (on, attr, v, l) => `<button class="${on ? 'on' : ''}" ${attr}="${v}" style="${on ? 'background:var(--pri-soft);border-color:var(--pri);color:#1F57C8' : ''}">${l}</button>`;
+
 function shell(inner) {
   el('wrap').innerHTML = `
+  <div class="tabs" id="anTabs" style="flex-wrap:wrap">${TABS.map(([k, l]) => `<button class="${st.tab === k ? 'on' : ''}" data-t="${k}">${l}</button>`).join('')}</div>
   <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px">
-    <div class="seg" id="anRange">${[[1, '오늘'], [7, '7일'], [30, '30일'], [90, '90일']].map(([d, l]) =>
-      `<button class="${range.days === d ? 'on' : ''}" data-d="${d}" style="${range.days === d ? 'background:var(--pri-soft);border-color:var(--pri);color:#1F57C8' : ''}">${l}</button>`).join('')}</div>
+    <div class="seg" id="anRange">${[[1, '오늘'], [7, '7일'], [30, '30일'], [90, '90일']].map(([d, l]) => segBtn(range.days === d, 'data-d', d, l)).join('')}</div>
+    ${st.tab === 'traffic' ? '' : `<div class="seg" id="anWho" title="봇: 검색 로봇·자동화 브라우저(자동 점검 포함)">${WHO.map(([k, l]) => segBtn(st.who === k, 'data-w', k, l)).join('')}</div>`}
     <span style="font-size:11px;color:var(--muted)" id="anRangeTxt"></span>
     <div style="flex:1"></div>
     <button class="btn sm" id="anRefresh">새로고침</button>
     <button class="btn sm ghost" id="anLogin">${ls.get(SES_KEY)?.email ? $esc(ls.get(SES_KEY).email) + ' · 로그아웃' : '로그인'}</button>
   </div>
+  <div id="anSql"></div>
   <div id="anBody">${inner}</div>`;
+  el('anTabs').onclick = e => { const t = e.target.closest('[data-t]'); if (t) { st.tab = t.dataset.t; st.open = null; saveUi(); page(); } };
   el('anRange').onclick = e => { const d = +e.target.dataset.d; if (d) { range.days = d; page(); } };
+  const w = document.getElementById('anWho');
+  if (w) w.onclick = e => { const v = e.target.dataset.w; if (v) { st.who = v; saveUi(); page(); } };
   el('anRefresh').onclick = () => page();
   el('anLogin').onclick = () => {
     if (ls.get(SES_KEY)) { logout(); page(); } else openLogin();
   };
+}
+
+function sqlBanner(what) {
+  const host = document.getElementById('anSql');
+  if (!host) return;
+  host.innerHTML = `<div class="card" style="margin-bottom:14px;border-color:#F2D49B;background:var(--warn-soft)">
+    <b>DB 업데이트가 한 번 필요해요</b>
+    <div style="margin-top:6px;font-size:12.5px;line-height:1.7">${what}<br>
+      Supabase → <b>SQL Editor</b> 에 <b>analytics/schema.sql</b> 을 통째로 붙여 넣고 <b>Run</b> 을 누르세요. 여러 번 실행해도 괜찮아요.
+      <a href="https://github.com/butblank-oss/balsatang-admin/blob/main/analytics/schema.sql" target="_blank" rel="noopener" style="color:var(--pri-ink);font-weight:700">schema.sql 열기 ↗</a></div></div>`;
 }
 
 function openLogin(errMsg) {
@@ -163,11 +218,25 @@ async function page() {
   shell(`<div class="card"><div class="empty">불러오는 중…</div></div>`);
   const { from, to } = rangeDates();
   el('anRangeTxt').textContent = `${from} ~ ${to} (한국 시간)`;
+  needSql = false;
   try {
-    const [d, r] = await Promise.all([dashboard(from, to), recent(80)]);
-    last = d;
-    el('anBody').innerHTML = view(d, r);
-    wireChart(d);
+    const body = el('anBody');
+    if (st.tab === 'traffic') {
+      const [t, d] = await Promise.all([traffic(from, to).catch(e => { if (missingFn(e)) { needSql = true; return null; } throw e; }), dashboard(from, to, 'human')]);
+      last = d;
+      body.innerHTML = t ? viewTraffic(t, d) : viewTrafficOld(d);
+      if (t) wireStack(t);
+    } else if (st.tab === 'sessions') {
+      st.sess = []; st.sessTotal = 0;
+      try { await moreSessions(from, to); body.innerHTML = viewSessions(); wireSessions(); }
+      catch (e) { if (!missingFn(e)) throw e; needSql = true; body.innerHTML = '<div class="card"><div class="empty">세션별 보기는 DB 업데이트 뒤에 열려요</div></div>'; }
+    } else {
+      const [d, r] = await Promise.all([dashboard(from, to, st.who), st.tab === 'acts' ? recent(80) : null]);
+      last = d;
+      body.innerHTML = st.tab === 'foods' ? viewFoods(d) : st.tab === 'acts' ? viewActs(d, r) : viewDash(d);
+      if (st.tab === 'dash') wireChart(d);
+    }
+    if (needSql) sqlBanner('사람·봇 구분, 유입 종류, 세션별 보기를 쓰려면 새 DB 함수가 있어야 해요. 지금 숫자에는 봇이 섞여 있어요.');
   } catch (e) {
     if (e.auth) { openLogin(e.message); return; }
     el('anBody').innerHTML = `<div class="card"><div class="empty" style="color:#B91C1C">${$esc(e.message)}</div></div>`;
@@ -223,14 +292,18 @@ function bars(rows, key, labelFn, valFn) {
     <div style="width:86px;text-align:right;font-size:12px;font-variant-numeric:tabular-nums;color:var(--ink2)">${valFn(r)}</div></div>`).join('');
 }
 
-function view(d, ev) {
+const sec = (t, body, extra = '') => `<div class="card" style="margin-bottom:14px"><div class="sec-t">${t}${extra}</div>${body}</div>`;
+const hint = t => ` <span style="font-weight:500;color:var(--muted);font-size:11px">${t}</span>`;
+const whoNote = () => st.who === 'human' ? '' : st.who === 'bot' ? hint('— 봇만 센 숫자') : hint('— 사람과 봇을 합친 숫자');
+
+/* ── 대시보드 — 요즘 어떤가. 핵심 숫자·추이·퍼널·유입 요약만. ── */
+function viewDash(d) {
   const c = d.kpi?.cur || {}, p = d.kpi?.prev || {};
   const f = d.funnel || {};
   const ins = insights(d);
   const steps = [['방문', f.visited], ['탐색 (검색·카드)', f.explored], ['사료 상세', f.viewed_food], ['찜·비교·맞춤', f.engaged], ['구매 클릭', f.clicked_buy]];
   const env = k => (d.envs || []).filter(x => x.k === k).sort((a, b) => b.visitors - a.visitors);
-  const sec = (t, body, extra = '') => `<div class="card" style="margin-bottom:14px"><div class="sec-t">${t}${extra}</div>${body}</div>`;
-
+  const wb = (d.whos || []).find(x => x.who === 'bot');
   return `
   <div class="kpis an-kpis">
     ${kpiTile('방문자', 'smile', c.visitors, p.visitors)}
@@ -240,75 +313,209 @@ function view(d, ev) {
     ${kpiTile('구매 클릭', 'coins', c.buy_clicks, p.buy_clicks, `${num(c.buyers)}명 · 방문자의 ${pct(c.buyers, c.visitors)}`)}
     ${kpiTile('맞춤 완료', 'paw', c.profiles, p.profiles)}
   </div>
+  ${st.who === 'human' && wb && wb.sessions ? `<div style="margin:-6px 0 14px;font-size:11.5px;color:var(--muted)">이 기간 봇 방문 ${num(wb.sessions)}회는 빼고 셌어요 · <a href="#" onclick="ANALYTICS.tab('traffic');return false" style="color:var(--pri-ink);font-weight:700">유입 탭에서 보기</a></div>` : ''}
 
   ${ins.length ? sec('인사이트', ins.map(i => `<div class="todo"><span class="bul" style="background:${i.c}"></span><span style="line-height:1.6">${i.t}</span></div>`).join('')) : ''}
 
-  ${sec('일별 방문자', `<div id="anChart" style="position:relative"></div>`, ' <span style="font-weight:500;color:var(--muted);font-size:11px">막대에 올리면 신규·방문·구매 클릭이 보여요</span>')}
+  ${sec('일별 방문자' + whoNote(), `<div id="anChart" style="position:relative"></div>`, hint('막대에 올리면 신규·방문·구매 클릭이 보여요'))}
 
   <div class="grid2 an2">
-    ${sec('전환 퍼널 <span style="font-weight:500;color:var(--muted);font-size:11px">— 기간 내 기기 기준</span>',
+    ${sec('전환 퍼널' + hint('— 기간 내 기기 기준'),
       bars(steps.map(([l, v]) => ({ l, v: v || 0 })), 'v', r => r.l, r => `${num(r.v)} · ${pct(r.v, f.visited)}`))}
-    ${sec('유입 경로', table([
-      { h: '경로', f: r => $esc(r.source) }, { h: '방문', r: 1, f: r => num(r.sessions) },
-      { h: '신규', r: 1, f: r => num(r.new_visitors) }, { h: '구매 전환', r: 1, f: r => pct(r.buy_sessions, r.sessions) }], d.sources || []))}
+    ${sec('어디서 왔나' + hint('— 방문 기준'), (d.kinds || []).length
+      ? bars(d.kinds, 'sessions', r => $esc(kindName(r.kind)), r => `${num(r.sessions)} · 구매 ${pct(r.buy_sessions, r.sessions)}`)
+      : table([{ h: '경로', f: r => $esc(r.source) }, { h: '방문', r: 1, f: r => num(r.sessions) }], d.sources || []))}
   </div>
 
   <div class="grid2 an2">
-    ${sec('많이 본 사료', table([
-      { h: '사료', f: r => `<div class="t-main">${$esc(foodName(r.id))}</div>` },
-      { h: '조회', r: 1, f: r => num(r.views) }, { h: '사람', r: 1, f: r => num(r.visitors) },
-      { h: '구매 클릭', r: 1, f: r => `${num(r.buy_clicks)} <span style="color:var(--muted)">${pct(r.buy_clicks, r.views)}</span>` },
-      { h: '비교', r: 1, f: r => num(r.compare_adds) }, { h: '찜', r: 1, f: r => num(r.saves) }], (d.foods || []).slice(0, 15)))}
-    ${sec('화면별', table([
-      { h: '화면', f: r => screenName(r.screen) }, { h: '조회', r: 1, f: r => num(r.views) },
-      { h: '사람', r: 1, f: r => num(r.visitors) }, { h: '머문 시간(중간값)', r: 1, f: r => r.median_sec == null ? '—' : r.median_sec + '초' }],
-      (d.screens || []).filter(r => r.screen)))}
+    ${sec('주간 재방문' + hint('— 처음 온 주 기준 · 최근 8주'), table([
+      { h: '첫 방문 주', f: r => r.wk }, { h: '신규', r: 1, f: r => num(r.size) },
+      ...[1, 2, 3, 4].map(n => ({ h: n + '주 뒤', r: 1, f: r => cohortCell(r, n) }))], d.cohorts || []))}
+    ${sec('기기', ['device', 'os', 'browser', 'app'].map(k => `<div style="margin-bottom:10px"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">${{ device: '기기', os: '운영체제', browser: '브라우저', app: '앱/웹' }[k]}</div>
+      <div class="chips">${env(k).map(x => `<span class="chip" style="cursor:default">${$esc(x.v)} <b style="margin-left:4px">${num(x.visitors)}</b></span>`).join('') || '—'}</div></div>`).join(''))}
+  </div>`;
+}
+
+/* ── 유입 — 어디서 왔고, 사람인가 ── */
+function viewTraffic(t, d) {
+  const sum = Object.fromEntries((t.summary || []).map(x => [x.who, x]));
+  const h = sum.human || {}, b = sum.bot || {};
+  const all = (h.sessions || 0) + (b.sessions || 0);
+  const hk = (t.kinds || []).filter(x => x.who === 'human');
+  return `
+  <div class="kpis an-kpis">
+    <div class="kpi ok"><div class="kpi-l">${ico('smile', 14)}사람 방문</div><div class="kpi-v">${num(h.sessions || 0)}</div><div class="kpi-s">${num(h.visitors || 0)}명</div></div>
+    <div class="kpi"><div class="kpi-l">${ico('refresh', 14)}봇 방문</div><div class="kpi-v">${num(b.sessions || 0)}</div><div class="kpi-s">${num(b.visitors || 0)}개 기기 · 기록 ${num(b.events || 0)}건</div></div>
+    <div class="kpi"><div class="kpi-l">${ico('chart', 14)}봇 비율</div><div class="kpi-v">${pct(b.sessions || 0, all)}</div><div class="kpi-s">전체 방문 ${num(all)}회 중</div></div>
   </div>
 
+  ${sec('일별 방문 — 사람 / 봇', `<div id="anStack"></div>
+    <div style="display:flex;gap:14px;margin-top:8px;font-size:11.5px;color:var(--sub)">
+      <span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--pri);margin-right:5px"></i>사람</span>
+      <span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#F2B544;margin-right:5px"></i>봇</span></div>`)}
+
+  <div class="grid2 an2">
+    ${sec('사람은 어디서 왔나', hk.length
+      ? bars(hk, 'sessions', r => $esc(kindName(r.kind)), r => `${num(r.sessions)} · 구매 ${pct(r.buy_sessions, r.sessions)}`)
+      : '<div class="empty" style="padding:28px">아직 기록이 없어요</div>')}
+    ${sec('봇 종류', table([
+      { h: '봇', f: r => `<div class="t-main">${$esc(botName(r.bot))}</div><div style="font-size:10.5px;color:var(--muted)">${$esc(r.bot || '')}</div>` },
+      { h: '방문', r: 1, f: r => num(r.sessions) }, { h: '기록', r: 1, f: r => num(r.events) },
+      { h: '마지막', r: 1, f: r => `<span style="white-space:nowrap">${new Date(r.last).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>` }],
+      t.bots || [], '이 기간에 들어온 봇이 없어요'))}
+  </div>
+
+  ${sec('들어온 곳 자세히', table([
+    { h: '구분', f: r => r.who === 'bot' ? '<span class="tag warn">봇</span>' : '<span class="tag good">사람</span>' },
+    { h: '종류', f: r => $esc(kindName(r.kind)) }, { h: '출처', f: r => `<span class="t-main">${$esc(r.source)}</span>` },
+    { h: '방문', r: 1, f: r => num(r.sessions) }, { h: '사람/기기', r: 1, f: r => num(r.visitors) },
+    { h: '구매 전환', r: 1, f: r => pct(r.buy_sessions, r.sessions) }], t.sources || []))}
+
+  <div class="grid2 an2">
+    ${sec('캠페인 (utm)' + hint('— 사람만'), table([
+      { h: 'source / medium', f: r => `${$esc(r.source)}${r.medium ? ' / ' + $esc(r.medium) : ''}` }, { h: '캠페인', f: r => $esc(r.campaign) },
+      { h: '방문', r: 1, f: r => num(r.sessions) }, { h: '구매 전환', r: 1, f: r => pct(r.buy_sessions, r.sessions) }], d.campaigns || [],
+      '링크에 ?utm_source=…&utm_campaign=… 를 붙이면 여기 나와요'))}
+    ${sec('처음 들어온 화면' + hint('— 사람만'), table([
+      { h: '화면', f: r => $esc(r.landing) }, { h: '방문', r: 1, f: r => num(r.sessions) }], d.landings || []))}
+  </div>
+
+  <div style="font-size:11.5px;color:var(--muted);line-height:1.7;margin:4px 2px 0">
+    봇은 브라우저가 스스로 밝히는 값(검색 로봇 이름, 자동화 표시)으로 가려요. curl·API 처럼 화면을 실행하지 않는 수집은
+    이 기록에 아예 남지 않아요 — GitHub Pages 는 서버 접속 기록을 주지 않거든요.</div>`;
+}
+
+/* 새 DB 함수가 없을 때 — 예전 유입 표만 */
+function viewTrafficOld(d) {
+  return sec('유입 경로' + hint('— 사람·봇 섞임'), table([
+    { h: '경로', f: r => $esc(r.source) }, { h: '방문', r: 1, f: r => num(r.sessions) },
+    { h: '신규', r: 1, f: r => num(r.new_visitors) }, { h: '구매 전환', r: 1, f: r => pct(r.buy_sessions, r.sessions) }], d.sources || []));
+}
+
+/* 사람/봇 쌓은 막대 */
+function wireStack(t) {
+  const host = document.getElementById('anStack');
+  if (!host) return;
+  const { from, to } = rangeDates();
+  const by = Object.fromEntries((t.daily || []).map(x => [x.d, x]));
+  const days = [];
+  for (let d = new Date(from + 'T00:00:00Z'); d.toISOString().slice(0, 10) <= to && days.length <= 120; d = new Date(d.getTime() + 86400e3)) {
+    const k = d.toISOString().slice(0, 10); days.push(by[k] || { d: k, human: 0, bot: 0 });
+  }
+  const W = Math.max(320, host.clientWidth || 600), H = 150, padL = 34, padB = 22, padT = 8;
+  const top = Math.max(1, ...days.map(x => x.human + x.bot));
+  const bw = (W - padL) / days.length, y = v => padT + (H - padT - padB) * (1 - v / top);
+  const every = Math.ceil(days.length / 8);
+  host.innerHTML = `<svg width="100%" viewBox="0 0 ${W} ${H}" style="display:block" role="img" aria-label="일별 사람·봇 방문">
+    ${[0, top].map(v => `<line x1="${padL}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${padL - 6}" y="${y(v) + 3}" text-anchor="end" font-size="10" fill="var(--muted)">${num(v)}</text>`).join('')}
+    ${days.map((x, i) => {
+      const bx = padL + i * bw + Math.min(2, bw * .15), w = Math.max(1, bw - Math.min(4, bw * .3));
+      return `<g><title>${x.d} · 사람 ${x.human} · 봇 ${x.bot}</title>
+        <rect x="${bx}" y="${y(x.human)}" width="${w}" height="${y(0) - y(x.human)}" fill="var(--pri)"/>
+        <rect x="${bx}" y="${y(x.human + x.bot)}" width="${w}" height="${y(x.human) - y(x.human + x.bot)}" fill="#F2B544"/>
+        ${i % every === 0 ? `<text x="${padL + i * bw + bw / 2}" y="${H - 6}" text-anchor="middle" font-size="10" fill="var(--muted)">${x.d.slice(5).replace('-', '/')}</text>` : ''}</g>`;
+    }).join('')}</svg>`;
+}
+
+/* ── 세션별 — 한 번 방문에 무엇을 했나 ── */
+const PAGE = 50;
+async function moreSessions(from, to) {
+  const r = await sessions(from, to, st.who, PAGE, st.sess.length);
+  st.sess = st.sess.concat(r.rows || []); st.sessTotal = r.total || 0;
+}
+const dur = (a, b) => { const s = Math.round((new Date(b) - new Date(a)) / 1000); return s < 60 ? s + '초' : s < 3600 ? Math.floor(s / 60) + '분 ' + (s % 60) + '초' : Math.floor(s / 3600) + '시간 ' + Math.floor(s % 3600 / 60) + '분'; };
+const hhmm = d => new Date(d).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+function viewSessions() {
+  const rows = st.sess;
+  if (!rows.length) return sec('세션' + whoNote(), '<div class="empty" style="padding:28px">이 기간에 방문이 없어요</div>');
+  return sec(`세션 ${num(st.sessTotal)}개` + whoNote(), `<div style="font-size:11.5px;color:var(--muted);margin:-6px 0 10px">한 줄이 한 번의 방문이에요 (30분 쉬면 새 방문). 누르면 그 방문에서 한 일을 순서대로 보여줘요.</div>
+    <div style="overflow-x:auto"><table id="anSess"><thead><tr>
+      <th>시작</th><th>구분</th><th>들어온 곳</th><th>기기</th><th style="text-align:right">머문 시간</th>
+      <th style="text-align:right">화면</th><th style="text-align:right">사료</th><th style="text-align:right">검색</th><th>결과</th></tr></thead>
+    <tbody>${rows.map(r => `<tr data-sid="${$esc(r.session_id)}" style="cursor:pointer${st.open === r.session_id ? ';background:var(--panel2)' : ''}">
+      <td style="white-space:nowrap">${hhmm(r.started)}<div style="font-size:10.5px;color:var(--muted)">${r.is_new ? '첫 방문' : '재방문'} · <span style="font-family:ui-monospace,monospace">${$esc(String(r.device_id).slice(0, 6))}</span></div></td>
+      <td>${whoTag(r.who, r.bot)}</td>
+      <td><div class="t-main">${$esc(kindName(r.kind))}</div><div style="font-size:10.5px;color:var(--muted)">${$esc(r.source || '')}</div></td>
+      <td style="white-space:nowrap">${$esc([r.device, r.os, r.browser].filter(Boolean).join(' · '))}</td>
+      <td style="text-align:right;white-space:nowrap">${dur(r.started, r.ended)}</td>
+      <td style="text-align:right">${num(r.screens)}</td><td style="text-align:right">${num(r.foods)}</td><td style="text-align:right">${num(r.searches)}</td>
+      <td>${[r.buys ? `<span class="tag good">구매 클릭 ${r.buys}</span>` : '', r.profile ? '<span class="tag info">맞춤 완료</span>' : '', r.error ? '<span class="tag bad">오류</span>' : ''].join(' ') || '<span style="color:var(--muted)">—</span>'}</td>
+    </tr>${st.open === r.session_id ? `<tr><td colspan="9" style="background:var(--panel2);padding:14px 16px" id="anTl">불러오는 중…</td></tr>` : ''}`).join('')}</tbody></table></div>
+    ${st.sess.length < st.sessTotal ? `<div style="text-align:center;margin-top:12px"><button class="btn sm" id="anMore">${num(st.sessTotal - st.sess.length)}개 더 보기</button></div>` : ''}`);
+}
+
+function wireSessions() {
+  const t = document.getElementById('anSess');
+  if (t) t.onclick = e => {
+    const tr = e.target.closest('tr[data-sid]');
+    if (!tr) return;
+    st.open = st.open === tr.dataset.sid ? null : tr.dataset.sid;
+    el('anBody').innerHTML = viewSessions(); wireSessions();
+  };
+  const m = document.getElementById('anMore');
+  if (m) m.onclick = async () => {
+    m.disabled = true; m.textContent = '불러오는 중…';
+    const { from, to } = rangeDates();
+    try { await moreSessions(from, to); } catch (e) { global.toast(e.message); }
+    el('anBody').innerHTML = viewSessions(); wireSessions();
+  };
+  const tl = document.getElementById('anTl');
+  if (tl && st.open) sessionEvents(st.open).then(ev => {
+    if (!ev.length) { tl.textContent = '기록이 없어요'; return; }
+    const t0 = new Date(ev[0].ts).getTime();
+    tl.innerHTML = `<div style="display:grid;grid-template-columns:64px 120px 1fr;gap:6px 12px;font-size:12px;line-height:1.5">
+      ${ev.map(r => `<span style="color:var(--muted);font-variant-numeric:tabular-nums">+${dur(t0, r.ts)}</span>
+        <b style="font-weight:700">${$esc(EVENT_KO[r.name] || r.name)}</b>
+        <span style="color:var(--sub)">${$esc(describe(r))}</span>`).join('')}</div>`;
+  }).catch(e => { tl.textContent = e.message; });
+}
+
+/* ── 사료·검색 ── */
+function viewFoods(d) {
+  return `
+  ${sec('많이 본 사료' + whoNote(), table([
+    { h: '사료', f: r => `<div class="t-main">${$esc(foodName(r.id))}</div>` },
+    { h: '조회', r: 1, f: r => num(r.views) }, { h: '사람', r: 1, f: r => num(r.visitors) },
+    { h: '구매 클릭', r: 1, f: r => `${num(r.buy_clicks)} <span style="color:var(--muted)">${pct(r.buy_clicks, r.views)}</span>` },
+    { h: '비교', r: 1, f: r => num(r.compare_adds) }, { h: '찜', r: 1, f: r => num(r.saves) }, { h: '공유', r: 1, f: r => num(r.shares) }], (d.foods || []).slice(0, 30)))}
   <div class="grid2 an2">
     ${sec('검색어 TOP', table([
       { h: '검색어', f: r => $esc(r.q) }, { h: '횟수', r: 1, f: r => num(r.n) }, { h: '사람', r: 1, f: r => num(r.visitors) },
       { h: '결과', r: 1, f: r => r.max_results === 0 ? '<span class="tag bad">0건</span>' : num(r.max_results) }], d.searches || []))}
-    ${sec('결과 0건 검색 <span style="font-weight:500;color:var(--muted);font-size:11px">— 사료·동의어 추가 후보</span>', table([
+    ${sec('결과 0건 검색' + hint('— 사료·동의어 추가 후보'), table([
       { h: '검색어', f: r => $esc(r.q) }, { h: '횟수', r: 1, f: r => num(r.n) }, { h: '사람', r: 1, f: r => num(r.visitors) }], d.zero || [], '결과 없는 검색이 없어요'))}
   </div>
-
   <div class="grid2 an2">
-    ${sec('주간 재방문 <span style="font-weight:500;color:var(--muted);font-size:11px">— 처음 온 주 기준 · 최근 8주</span>', table([
-      { h: '첫 방문 주', f: r => r.wk }, { h: '신규', r: 1, f: r => num(r.size) },
-      ...[1, 2, 3, 4].map(n => ({ h: n + '주 뒤', r: 1, f: r => cohortCell(r, n) }))], d.cohorts || []))}
     ${sec('맞춤 추천 고민', (d.concerns || []).length
       ? bars(d.concerns, 'n', r => $esc(concernLabel(r.concern)), r => num(r.n))
       : '<div class="empty" style="padding:28px">아직 기록이 없어요</div>')}
-  </div>
+    ${sec('분석 요청', table([
+      { h: '종류', f: r => $esc(r.type === 'analysis' ? '분석 요청' : r.type) }, { h: '대상', f: r => $esc(foodName(r.target)) },
+      { h: '횟수', r: 1, f: r => num(r.n) }], d.requests || [], '아직 요청이 없어요'))}
+  </div>`;
+}
 
+/* ── 행동·오류 ── */
+function viewActs(d, ev) {
+  return `
   <div class="grid2 an2">
-    ${sec('캠페인 (utm)', table([
-      { h: 'source / medium', f: r => `${$esc(r.source)}${r.medium ? ' / ' + $esc(r.medium) : ''}` }, { h: '캠페인', f: r => $esc(r.campaign) },
-      { h: '방문', r: 1, f: r => num(r.sessions) }, { h: '구매 전환', r: 1, f: r => pct(r.buy_sessions, r.sessions) }], d.campaigns || [],
-      '링크에 ?utm_source=…&utm_campaign=… 를 붙이면 여기 나와요'))}
-    ${sec('처음 들어온 화면', table([
-      { h: '화면', f: r => $esc(r.landing) }, { h: '방문', r: 1, f: r => num(r.sessions) }], d.landings || []))}
-  </div>
-
-  <div class="grid2 an2">
-    ${sec('기기', ['device', 'os', 'browser', 'app'].map(k => `<div style="margin-bottom:10px"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">${{ device: '기기', os: '운영체제', browser: '브라우저', app: '앱/웹' }[k]}</div>
-      <div class="chips">${env(k).map(x => `<span class="chip" style="cursor:default">${$esc(x.v)} <b style="margin-left:4px">${num(x.visitors)}</b></span>`).join('') || '—'}</div></div>`).join(''))}
+    ${sec('화면별' + whoNote(), table([
+      { h: '화면', f: r => screenName(r.screen) }, { h: '조회', r: 1, f: r => num(r.views) },
+      { h: '사람', r: 1, f: r => num(r.visitors) }, { h: '머문 시간(중간값)', r: 1, f: r => r.median_sec == null ? '—' : r.median_sec + '초' }],
+      (d.screens || []).filter(r => r.screen)))}
     ${sec('모든 행동', table([
       { h: '이벤트', f: r => `${$esc(EVENT_KO[r.name] || r.name)} <span style="color:var(--muted);font-size:10.5px">${$esc(r.name)}</span>` },
       { h: '횟수', r: 1, f: r => num(r.n) }, { h: '사람', r: 1, f: r => num(r.visitors) }], d.actions || []))}
   </div>
-
-  ${(d.errors || []).length ? sec('오류', table([
+  ${sec('오류', table([
     { h: '메시지', f: r => $esc(r.msg) }, { h: '위치', f: r => `${$esc(r.src)}:${$esc(r.line)}` },
-    { h: '횟수', r: 1, f: r => num(r.n) }, { h: '마지막', f: r => new Date(r.last).toLocaleString('ko-KR') }], d.errors)) : ''}
-
-  ${sec('실시간 기록 <span style="font-weight:500;color:var(--muted);font-size:11px">— 최근 80건</span>', table([
+    { h: '횟수', r: 1, f: r => num(r.n) }, { h: '마지막', f: r => new Date(r.last).toLocaleString('ko-KR') }], d.errors || [], '기록된 오류가 없어요'))}
+  ${sec('실시간 기록' + hint('— 최근 80건 · 사람·봇 모두'), table([
     { h: '시각', f: r => `<span style="white-space:nowrap">${new Date(r.ts).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>` },
     { h: '기기', f: r => `<span style="font-family:ui-monospace,monospace;color:var(--sub)">${$esc(String(r.device_id).slice(0, 6))}</span>` },
-    { h: '행동', f: r => $esc(EVENT_KO[r.name] || r.name) },
-    { h: '내용', f: r => `<span style="color:var(--sub)">${$esc(describe(r))}</span>` }], ev || []))}
-  `;
+    { h: '행동', f: r => $esc(EVENT_KO[r.name] || r.name) + (r.props?.agent && r.props.agent !== 'human' ? ' <span class="tag warn">봇</span>' : '') },
+    { h: '내용', f: r => `<span style="color:var(--sub)">${$esc(describe(r))}</span>` }], ev || []))}`;
 }
 
 function cohortCell(r, n) {
@@ -378,5 +585,6 @@ function wireChart(d) {
   host.querySelector('svg').addEventListener('mouseleave', () => { tip.style.display = 'none'; });
 }
 
-global.ANALYTICS = { page, openLogin, logout, last: () => last };
+global.ANALYTICS = { page, openLogin, logout, last: () => last,
+  tab(t) { st.tab = t; st.open = null; saveUi(); page(); } };
 })(window);
