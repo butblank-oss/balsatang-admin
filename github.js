@@ -26,6 +26,16 @@ const GH = {
   get token() { return localStorage.getItem(this.KEY) || ''; },
   set token(v) { v ? localStorage.setItem(this.KEY, v) : localStorage.removeItem(this.KEY); },
 
+  /* 토큰 넣는 창을 연다. 어드민 안(iframe)이면 껍데기의 창을 쓴다 — 저장 전에 쓰기 권한까지
+     확인해 준다. 예전엔 '먼저 토큰을 넣어주세요' 토스트만 떠서, 머리가 감춰진 심사 화면에선
+     어디서 넣는지 알 수 없었다(새 맥에서 발행하려다 막힘). */
+  ask(fallback) {
+    try {
+      if (window.top !== window && typeof window.top.openToken === 'function') { window.top.openToken(); return; }
+    } catch (e) { }
+    if (typeof fallback === 'function') fallback();
+  },
+
   async api(path, opt = {}) {
     const res = await fetch(`https://api.github.com${path}`, {
       ...opt,

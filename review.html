@@ -340,7 +340,7 @@ document.write(['engine/dict.js', 'engine/phrases.js', 'engine/engine.js',
                 'engine/policy.js', 'engine/gate1.js', 'engine/label.js']
   .map(function (f) { return '<scr' + 'ipt src="' + window.APP_BASE + f + '"><\/scr' + 'ipt>'; }).join(''));
 </script>
-<script src="github.js?v=20261008a"></script>
+<script src="github.js?v=20261008b"></script>
 <script src="publish.js?v=20261008a"></script>
 <script>
 const TYPE_KO={dry:'건식',wet:'습식',air_dried:'에어드라이',freeze_dried:'동결건조',raw:'화식'};
@@ -1401,7 +1401,7 @@ async function loadReview(){
 }
 
 /* ── 토큰 ── */
-document.getElementById('tokenBtn').addEventListener('click',async()=>{
+function promptToken(){
   const v=prompt(
     'fine-grained personal access token 을 넣어주세요.\n'+
     '· Repository access: butblank-oss/balsatang 하나만\n'+
@@ -1412,13 +1412,15 @@ document.getElementById('tokenBtn').addEventListener('click',async()=>{
   if(v===null||v==='••••••••')return;
   GH.token=v.trim();
   location.reload();
-});
+}
+document.getElementById('tokenBtn').addEventListener('click',()=>GH.ask(promptToken));
 
 /* ── 발행 ──
    승인한 건을 그 자리에서 data.js 에 병합해 커밋한다.
    이 버튼이 있기 전에는 명령문을 복사해 누군가 터미널에서 실행해야 했다. */
 document.getElementById('publish').addEventListener('click',async()=>{
-  if(!GH.token){ toast('먼저 토큰을 넣어주세요'); return; }
+  /* 고친 내용은 브라우저에 저장돼 있어 토큰을 넣고 화면이 다시 떠도 남는다. */
+  if(!GH.token){ toast('이 브라우저엔 아직 토큰이 없어요 — 넣는 창을 열게요'); GH.ask(promptToken); return; }
   const pub=Object.values(decision).filter(v=>v==='publish').length;
   const rej=Object.values(decision).filter(v=>v==='reject').length;
   if(!pub&&!rej){ toast('발행하거나 반려할 항목을 골라주세요'); return; }
@@ -1463,6 +1465,7 @@ loadReview()
       `<div class="empty"><b>심사 데이터를 불러오지 못했습니다</b>
        ${esc(window.APP_BASE || '')}data/staging/review.json 을 읽지 못했어요.<br><br>
        토큰을 넣으면 저장소에서 곧바로 읽습니다 — 배포를 기다리지 않아도 돼요.<br>
+       <button class="alt" style="margin-top:12px" onclick="GH.ask(promptToken)">토큰 넣기</button><br>
        <span style="color:var(--muted);font-size:12px">(${esc(err.message)})</span></div>`;
   });
 </script>

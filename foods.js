@@ -1076,7 +1076,9 @@ async function boot() {
     $('#wrap').innerHTML = `<div class="empty"><b>먼저 토큰을 넣어주세요</b>
       ${inShell
         ? '이 화면 맨 위 <b>토큰</b> 버튼을 누르면 넣을 수 있어요. 한 번 넣으면 사료 관리·가격·심사가 함께 씁니다.'
-        : '오른쪽 위 <b>토큰</b> 버튼을 누르면 넣을 수 있어요.'}</div>`;
+        : '오른쪽 위 <b>토큰</b> 버튼을 누르면 넣을 수 있어요.'}
+      <div style="margin-top:14px"><button class="btn pri" id="askTok">토큰 넣기</button></div></div>`;
+    $('#askTok').onclick = () => GH.ask(askToken);
     return;
   }
   try {
