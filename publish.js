@@ -179,7 +179,7 @@ const PUB = {
       const h = hi >= 0 ? hi : humanSrc('심사 화면에서 대표가 직접 확인·입력');
       evidence['facts.protein'] = { src: h, quote: `보장성분 조단백 ${p.ga?.protein}%` };
       evidence['facts.dmCarb'] = { src: h,
-        quote: `조단백 ${p.ga?.protein} / 조지방 ${p.ga?.fat} / 조섬유 ${p.ga?.fiber} / 수분 ${p.ga?.moisture} → 건물기준 탄수 ${p.facts.dmCarb ?? '계산 불가(빈 칸 있음)'}%` };
+        quote: `조단백 ${p.ga?.protein} / 조지방 ${p.ga?.fat} / 조섬유 ${p.ga?.fiber} / 수분 ${p.ga?.moisture} / 조회분 ${p.ga?.ash} → 건물기준 탄수 ${p.facts.dmCarb ?? '계산 불가(빈 칸 있음)'}%` };
     }
     /* 화면의 '주의성분 N종' 은 warnN 이다. 라벨로 원료가 바뀌면 주의·위험 수도 바뀌는데
        warnN 을 그대로 두면 게이트가 'warnN 이 사실값과 다릅니다' 로 막는다.
