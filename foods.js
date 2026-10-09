@@ -567,8 +567,8 @@ function renderNutOut(f) {
   const box = $('#nutOut'); if (!box) return;
   const d = detailOf(f), n = d.nutrient || {};
   const out = [];
-  if (n.dmCarb != null) out.push(`건물기준 탄수 <b>${n.dmCarb}%</b> (조회분은 빼지 않아요)`);
-  else out.push('조단백·조지방·조섬유·수분을 다 넣으면 탄수화물이 계산돼요');
+  if (n.dmCarb != null) out.push(`건물기준 탄수 <b>${n.dmCarb}%</b> (조회분까지 뺀 값)`);
+  else out.push('조단백·조지방·조섬유·수분·조회분을 다 넣으면 탄수화물이 계산돼요');
   const sum = ['protein', 'fat', 'fiber', 'moisture', 'ash'].reduce((a, k) => a + (Number(n[k]) || 0), 0);
   if (sum > 100) out.push(`<span style="color:var(--warn)">합이 ${Math.round(sum * 10) / 10}% 예요 — 100%를 넘습니다. 옮겨 적은 값을 확인해 주세요</span>`);
   box.innerHTML = out.join('<br>');

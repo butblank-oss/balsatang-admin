@@ -356,7 +356,7 @@ document.write(['engine/dict.js', 'engine/phrases.js', 'engine/engine.js',
   .map(function (f) { return '<scr' + 'ipt src="' + window.APP_BASE + f + '"><\/scr' + 'ipt>'; }).join(''));
 </script>
 <script src="github.js?v=20261008b"></script>
-<script src="publish.js?v=20261008xa"></script>
+<script src="publish.js?v=20261009xa"></script>
 <script>
 const TYPE_KO={dry:'건식',wet:'습식',air_dried:'에어드라이',freeze_dried:'동결건조',raw:'화식'};
 const RATING_LABEL={quality:'원료',carb:'탄수화물',additive:'첨가물',value:'가성비'};
@@ -688,7 +688,7 @@ function searchQ(it){const m=merged(it).proposed;return encodeURIComponent(`${m.
 function calcLine(it){
   const m=merged(it).proposed;
   const dm=m.facts?.dmCarb;
-  const miss=['protein','fat','fiber','moisture'].filter(k=>m.ga?.[k]==null).map(k=>({protein:'조단백',fat:'조지방',fiber:'조섬유',moisture:'수분'})[k]);
+  const miss=['protein','fat','fiber','moisture','ash'].filter(k=>m.ga?.[k]==null).map(k=>({protein:'조단백',fat:'조지방',fiber:'조섬유',moisture:'수분',ash:'조회분'})[k]);
   return dm!=null
     ? `건물기준 탄수 <b>${dm}%</b> — 위 값으로 자동 계산돼요`
     : `건물기준 탄수 <b>계산 불가</b> — ${miss.length?esc(miss.join('·'))+' 칸을 채워 주세요':'값을 확인해 주세요'}`;
@@ -1357,8 +1357,8 @@ document.addEventListener('click',e=>{
     const g=k=>card.querySelector(`[data-calc="${k}"]`).value;
     /* 조단백은 위 '고치기' 칸이 진짜다. 여기서 또 받지 않는다. */
     const protein=card.querySelector('[data-edit="facts.protein"]')?.value;
-    const dm=ENGINE.computeDmCarb({protein,fat:g('fat'),fiber:g('fiber'),moisture:g('moisture')});
-    if(dm==null){toast('조단백·조지방·조섬유·수분이 모두 있어야 계산됩니다');return;}
+    const dm=ENGINE.computeDmCarb({protein,fat:g('fat'),fiber:g('fiber'),moisture:g('moisture'),ash:g('ash')});
+    if(dm==null){toast('조단백·조지방·조섬유·수분·조회분이 모두 있어야 계산됩니다');return;}
     card.querySelector('[data-edit="facts.dmCarb"]').value=dm;
     setEdit(card.dataset.id,'facts.dmCarb',dm);
     toast(`건물기준 탄수 ${dm}% 로 채웠습니다`);

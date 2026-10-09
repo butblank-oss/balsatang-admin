@@ -70,7 +70,7 @@ const NEWFOOD = {
         <label>조지방 %<i>*</i>${inp('ga.fat', '', true)}</label>
         <label>조섬유 %<i>*</i>${inp('ga.fiber', '', true)}</label>
         <label>수분 %<i>*</i>${inp('ga.moisture', '', true)}</label>
-        <label>조회분 %${inp('ga.ash', '', true)}</label>
+        <label>조회분 %<i>*</i>${inp('ga.ash', '', true)}</label>
       </div>
       <div class="nf-g2">
         <label>칼로리 (100g당 kcal)${inp('kcal100', '340', true)}
@@ -246,8 +246,9 @@ const NEWFOOD = {
     if (!f.brand.trim() || !f.name.trim()) e.push('브랜드와 제품명을 적어주세요');
     if (!/^[a-z0-9-]+$/.test(f.brandSlug.trim())) e.push('브랜드 슬러그는 영문 소문자·숫자·하이픈만 됩니다');
     if (!f.ages.length || !f.sizes.length) e.push('연령과 체형을 하나 이상 골라주세요');
-    for (const k of ['protein', 'fat', 'fiber', 'moisture'])
-      if (d.ga[k] == null) e.push('보장성분표에서 조단백·조지방·조섬유·수분은 모두 필요합니다');
+    /* 탄수 계산이 조회분까지 빼도록 바뀌어(2026-10-09) 조회분도 필수다. 게이트 1 E_GA 와 같은 기준. */
+    if (['protein', 'fat', 'fiber', 'moisture', 'ash'].some(k => d.ga[k] == null))
+      e.push('보장성분표에서 조단백·조지방·조섬유·수분·조회분은 모두 필요합니다');
     if (d.list.length < 3) e.push('원료를 표기 순서대로 적어주세요 (최소 3개)');
     if (!d.pKg) e.push('가격과 용량을 적어주세요');
     else if (d.pKg < 1000 || d.pKg > 200000) e.push(`kg당 ${d.pKg.toLocaleString('ko-KR')}원은 상식 범위 밖이에요. 가격·용량을 확인해 주세요`);
@@ -302,7 +303,7 @@ const NEWFOOD = {
       evidence: {
         'facts.protein': { src: 0, quote: `조단백 ${d.ga.protein}% 이상 (라벨 표기)` },
         'facts.dmCarb': { src: 0, quote:
-          `조단백 ${d.ga.protein} + 조지방 ${d.ga.fat} + 조섬유 ${d.ga.fiber} + 수분 ${d.ga.moisture}` +
+          `조단백 ${d.ga.protein} + 조지방 ${d.ga.fat} + 조섬유 ${d.ga.fiber} + 수분 ${d.ga.moisture} + 조회분 ${d.ga.ash}` +
           ` → 건물기준 탄수 ${d.nutrient.dmCarb}%` },
         'facts.firstIngrCat': { src: 0, quote: `1번 원료 = ${d.ingr[0]?.name ?? '—'} (${d.ingr[0]?.cat ?? '—'})` },
         'facts.cautionN': { src: 0, quote:
