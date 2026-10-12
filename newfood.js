@@ -15,7 +15,7 @@
 
 const NEWFOOD = {
   /* 게이트가 아는 값들. 여기 없는 값을 넣으면 탈락한다. */
-  TYPE: { dry: '건식', wet: '습식', freeze_dried: '동결건조', air_dried: '에어드라이', raw: '화식', topping: '토핑' },
+  TYPE: { dry: '건식', wet: '습식', cooked: '화식', freeze_dried: '동결건조', air_dried: '에어드라이', raw: '생식', topping: '토핑' },
   COUNTRY: { KR: '대한민국', CA: '캐나다', US: '미국', FR: '프랑스', NZ: '뉴질랜드', AU: '호주',
     DE: '독일', IT: '이탈리아', NL: '네덜란드', BE: '벨기에', GB: '영국', JP: '일본', TH: '태국' },
   AGE: { puppy: '퍼피', adult: '성견', senior: '시니어', all: '전연령' },

@@ -24,7 +24,7 @@
 
 const PATH = 'data.js';
 
-const TYPE_KO = { dry: '건식', wet: '습식', freeze_dried: '동결건조', air_dried: '에어드라이', raw: '화식', topping: '토핑' };
+const TYPE_KO = { dry: '건식', wet: '습식', cooked: '화식', freeze_dried: '동결건조', air_dried: '에어드라이', raw: '생식', topping: '토핑' };
 const AGE_KO = { puppy: '퍼피', adult: '성견', senior: '시니어', all: '전연령' };
 const SIZE_KO = { small: '소형', medium: '중형', large: '대형', all: '전체' };
 const SHOP_KO = { coupang: '쿠팡', brand_official: '공식몰', naver: '네이버', other: '판매처' };

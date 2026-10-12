@@ -14,8 +14,9 @@ const CATEGORY_KO = {
 const SAFE_KO   = { safe:'양호', caution:'논쟁중', danger:'주의' };
 const FUNC_KO   = { eye_tear:'눈물·피모', joint:'관절', digestive:'소화', immune:'면역',
                     heart:'심장', weight:'체중', kidney:'신장', liver:'간', dental:'치아' };
-const TYPE_KO   = { dry:'건식', wet:'습식', freeze_dried:'동결건조', air_dried:'에어드라이',
-                    raw:'화식', topping:'토핑' };
+/* cooked = 화식(익힌 사료), raw = 생식. 예전엔 raw 를 '화식' 으로 적었다(2026-10-12 바로잡음). */
+const TYPE_KO   = { dry:'건식', wet:'습식', cooked:'화식', freeze_dried:'동결건조', air_dried:'에어드라이',
+                    raw:'생식', topping:'토핑' };
 const AGE_KO    = { puppy:'퍼피', adult:'성견', senior:'시니어', all:'전연령' };
 const SIZE_KO   = { small:'소형', medium:'중형', large:'대형', all:'전체' };
 const SHOP_KO   = { coupang:'쿠팡', naver:'네이버', mypet:'마이펫', gmarket:'G마켓',
@@ -143,7 +144,7 @@ function deriveIco(f){
   if(/양고기|양육/.test(first)) return 'beef';
   if(/돼지|돈육|포크/.test(first)) return 'ham';
   if(['freeze_dried','air_dried','raw'].includes(f.type)) return 'beef';
-  if(f.type === 'wet') return 'container';
+  if(f.type === 'wet' || f.type === 'cooked') return 'container';
   return 'dog';
 }
 
