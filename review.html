@@ -137,6 +137,43 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
 .stat b{display:block;font-size:20px;font-weight:700;letter-spacing:-.02em}
 .stat span{color:var(--sub);font-size:11px}
 
+/* ── 게시판 목록 (사료 관리와 같은 꼴) ──
+   예전엔 카드가 토글로 줄줄이 열려 70건을 훑기 힘들었다(대표 피드백 2026-10-12).
+   목록에서 찾고·정렬하고, 한 건을 눌러 들어가 고친다. */
+.lbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.lbar .search{flex:1;min-width:180px;height:34px;padding:0 12px;border-radius:var(--r);border:1px solid var(--line);background:var(--panel)}
+.fchips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.fchips button{height:30px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--sub);font-size:12.5px;font-weight:600;cursor:pointer}
+.fchips button.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.fchips button i{font-style:normal;opacity:.7;margin-left:4px}
+.ltbl{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+.ltbl th,.ltbl td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+.ltbl th{color:var(--sub);font-size:11.5px;font-weight:600;background:var(--panel2);white-space:nowrap;cursor:pointer;user-select:none}
+.ltbl th .ar{opacity:.35;margin-left:3px}
+.ltbl th.on{color:var(--ink)} .ltbl th.on .ar{opacity:1}
+.ltbl th.nosort{cursor:default}
+.ltbl tbody tr{cursor:pointer}
+.ltbl tbody tr:hover{background:var(--panel2)}
+.ltbl tr.edited td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
+.ltbl .lthumb{width:38px;height:38px;border-radius:7px;object-fit:contain;background:#fff;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--muted);font-weight:700}
+.ltbl .br{color:var(--sub);font-size:12px}
+.ltbl .nm{font-weight:600}
+.ltbl .num{text-align:right;white-space:nowrap}
+.ltbl .b{white-space:nowrap}
+.ltbl .dec{font-weight:700;font-size:12px}
+.ltbl .dec.pub{color:var(--good)} .ltbl .dec.rej{color:var(--bad)}
+@media(max-width:900px){.ltbl .c-type,.ltbl .c-when,.ltbl .c-price{display:none}}
+@media(max-width:560px){.ltbl .c-left{display:none}.ltbl th,.ltbl td{padding:8px 6px}}
+.lcount{color:var(--sub);font-size:12px;margin:0 0 8px}
+.dtop{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.dtop .back{height:34px;padding:0 14px;border-radius:var(--r);border:1px solid var(--line);background:var(--panel);font-weight:600;cursor:pointer}
+.dtop .pos{color:var(--sub);font-size:12px}
+.dtop .nav{margin-left:auto;display:flex;gap:6px}
+.dtop .nav button{height:34px;padding:0 12px;border-radius:var(--r);border:1px solid var(--line);background:var(--panel);cursor:pointer}
+.dtop .nav button:disabled{opacity:.4;cursor:default}
+.detail .card .hd{cursor:default}
+.detail .card .hd:hover{background:none}
+.detail .card .chev{display:none}
 .batch{margin-bottom:26px}
 .batch>h2{font-size:12px;color:var(--sub);font-weight:600;margin-bottom:10px;letter-spacing:.02em}
 
@@ -1002,6 +1039,98 @@ function card(it){
   </div>`;
 }
 
+/* ── 보기 상태 — 주소 해시에 담아 뒤로가기가 목록으로 돌아오게 한다 ── */
+const VIEW={q:'',f:'all',sort:'status',dir:1};
+try{Object.assign(VIEW,JSON.parse(sessionStorage.getItem('balsatang.review.view')||'{}'));}catch{}
+const saveView=()=>{try{sessionStorage.setItem('balsatang.review.view',JSON.stringify(VIEW));}catch{}};
+const openId=()=>{const m=location.hash.match(/^#\/(.+)$/);return m?decodeURIComponent(m[1]):null;};
+/* 사료 → 묶음(batch). 항목에 직접 달면 발행 때 review.json 을 JSON 으로 쓸 때 순환 참조가 된다. */
+const BATCH_OF=new WeakMap();
+const allItems=()=>DATA?(DATA.batches||[]).flatMap(b=>(b.items||[]).map(it=>(BATCH_OF.set(it,b),it))):[];
+const batchOf=it=>{if(!BATCH_OF.has(it))allItems();return BATCH_OF.get(it);};
+
+/* 상태 — 카드 배지와 같은 판정. 정렬 순서는 발행에 가까운 것부터. */
+const ST={ready:{k:'ready',t:'발행 후보',c:'ok',o:0},pending:{k:'pending',t:'가격 대기',c:'wa',o:1},
+  draft:{k:'draft',t:'자료 수집 중',c:'wa',o:2},fail:{k:'fail',t:'게이트1 탈락',c:'no',o:3}};
+function statusOf(it,G){G=G||gateNow(it);return G.draft?ST.draft:G.pending?ST.pending:G.ready?ST.ready:ST.fail;}
+function rowInfo(it){
+  const G=gateNow(it), m=merged(it).proposed, st=statusOf(it,G);
+  return {it,G,st,m,left:todoLeft(it),ed:isEdited(it),dec:decision[it.stagingId]||'',
+    price:m.price?.p??null,when:batchOf(it)?.collectedAt||'',batch:batchOf(it)?.file||''};
+}
+const SORT={
+  status:(a,b)=>a.st.o-b.st.o||a.left-b.left,
+  brand:(a,b)=>String(a.m.brand||'').localeCompare(String(b.m.brand||''),'ko')||String(a.m.name||'').localeCompare(String(b.m.name||''),'ko'),
+  name:(a,b)=>String(a.m.name||'').localeCompare(String(b.m.name||''),'ko'),
+  type:(a,b)=>String(TYPE_KO[a.m.type]||'').localeCompare(String(TYPE_KO[b.m.type]||''),'ko'),
+  left:(a,b)=>a.left-b.left,
+  price:(a,b)=>(a.price??Infinity)-(b.price??Infinity),
+  when:(a,b)=>String(a.when).localeCompare(String(b.when)),
+  dec:(a,b)=>String(b.dec).localeCompare(String(a.dec))
+};
+const FILTERS=[
+  ['all','전체',()=>true],
+  ['ready','발행 후보',r=>r.st.k==='ready'],
+  ['pending','가격 대기',r=>r.st.k==='pending'],
+  ['draft','자료 수집 중',r=>r.st.k==='draft'],
+  ['fail','탈락',r=>r.st.k==='fail'],
+  ['rx','처방식',r=>!!r.m.rx],
+  ['puppy','퍼피',r=>(r.m.ages||[]).includes('puppy')&&!(r.m.ages||[]).includes('adult')],
+  ['edited','수정함',r=>r.ed],
+  ['decided','발행·반려 고름',r=>!!r.dec]
+];
+function matchQ(r,q){
+  if(!q)return true;
+  const hay=`${r.m.brand||''} ${r.m.name||''} ${TYPE_KO[r.m.type]||''} ${r.it.stagingId} ${r.batch}`.toLowerCase().replace(/\s/g,'');
+  return q.toLowerCase().replace(/\s/g,'').split(/[,·]/).filter(Boolean).every(w=>hay.includes(w));
+}
+function visibleRows(){
+  const rows=allItems().map(rowInfo);
+  const f=(FILTERS.find(x=>x[0]===VIEW.f)||FILTERS[0])[2];
+  const out=rows.filter(r=>f(r)&&matchQ(r,VIEW.q));
+  const cmp=SORT[VIEW.sort]||SORT.status;
+  out.sort((a,b)=>cmp(a,b)*VIEW.dir||SORT.brand(a,b));
+  return {rows,out};
+}
+function listHtml(){
+  const {rows,out}=visibleRows();
+  const th=(k,l,cls='')=>`<th class="${cls}${VIEW.sort===k?' on':''}" data-sort="${k}">${l}<span class="ar">${VIEW.sort===k?(VIEW.dir>0?'▲':'▼'):'↕'}</span></th>`;
+  const tr=r=>{
+    const p=r.m, mt=p.thumb;
+    return `<tr data-open="${esc(r.it.stagingId)}" class="${r.ed?'edited':''}">
+      <td>${mt?`<img class="lthumb" src="${esc(mt)}" alt="" loading="lazy">`:`<span class="lthumb">${esc((p.brand||'?')[0])}</span>`}</td>
+      <td><div class="br">${esc(p.brand||'')}</div><div class="nm">${esc(p.name||r.it.label||'')}</div>
+        <div class="br">${p.rx?'처방식 · ':''}${(p.ages||[]).map(a=>({puppy:'퍼피',adult:'성견',senior:'시니어',all:'전연령'})[a]||a).join('·')}</div></td>
+      <td class="c-type">${esc(TYPE_KO[p.type]||p.type||'')}</td>
+      <td><span class="b ${r.st.c}">${r.st.t}</span>${r.ed?' <span class="b ed">수정됨</span>':''}</td>
+      <td class="num c-left">${r.left?`<b>${r.left}</b>개`:'<span class="br">없음</span>'}</td>
+      <td class="num c-price">${r.price?won(r.price):'—'}<div class="br">${p.price?.wg?p.price.wg+'g':''}</div></td>
+      <td class="c-when br">${esc(String(r.when).slice(0,10))}</td>
+      <td>${r.dec?`<span class="dec ${r.dec==='publish'?'pub':'rej'}">${r.dec==='publish'?'발행':'반려'}</span>`:''}</td>
+    </tr>`;
+  };
+  const cnt=k=>rows.filter((FILTERS.find(x=>x[0]===k)||FILTERS[0])[2]).length;
+  return `
+    <div class="lbar"><input class="search" id="lq" type="search" placeholder="브랜드·제품명·제형 검색 (쉼표로 여러 낱말)" value="${esc(VIEW.q)}"></div>
+    <div class="fchips">${FILTERS.map(([k,l])=>`<button data-filter="${k}" class="${VIEW.f===k?'on':''}">${l}<i>${cnt(k)}</i></button>`).join('')}</div>
+    <p class="lcount">${out.length}건 · 줄을 누르면 상세로 들어가 고칠 수 있어요</p>
+    <table class="ltbl"><thead><tr>
+      <th class="nosort"></th>${th('brand','브랜드 · 제품명')}${th('type','제형','c-type')}${th('status','상태')}
+      ${th('left','남은 일','c-left')}${th('price','가격','c-price')}${th('when','수집일','c-when')}${th('dec','결정')}
+    </tr></thead><tbody>${out.map(tr).join('')||`<tr><td colspan="8" style="text-align:center;color:var(--sub);padding:28px">조건에 맞는 사료가 없어요</td></tr>`}</tbody></table>`;
+}
+function detailHtml(it){
+  const {out}=visibleRows();
+  const i=out.findIndex(r=>r.it.stagingId===it.stagingId);
+  const prev=i>0?out[i-1].it.stagingId:'', next=i>=0&&i<out.length-1?out[i+1].it.stagingId:'';
+  return `<div class="detail">
+    <div class="dtop"><button class="back" data-back>← 목록</button>
+      <span class="pos">${i>=0?`${i+1} / ${out.length}`:''} · ${esc(batchOf(it)?.file||'')}</span>
+      <span class="nav"><button data-go="${esc(prev)}"${prev?'':' disabled'}>‹ 이전</button><button data-go="${esc(next)}"${next?'':' disabled'}>다음 ›</button></span></div>
+    ${card(it).replace('<div class="card ','<div class="card open ')}
+  </div>`;
+}
+
 function render(){
   const wrap=document.getElementById('wrap');
   const s=DATA.summary;
@@ -1012,23 +1141,48 @@ function render(){
     wrap.innerHTML=`<div class="empty"><b>발행 대기 중인 사료가 없습니다</b>수집 루틴이 돌면 여기에 나타납니다.</div>`;
     return;
   }
-  wrap.innerHTML=`
+  const id=openId(), it=id&&itemById(id);
+  if(it){
+    wrap.innerHTML=detailHtml(it);
+  }else{
+    wrap.innerHTML=`
     <div class="note">
-      카드를 열면 <b>왼쪽에서 채우고, 오른쪽 미리보기</b>로 사이트에 어떻게 보일지 확인하세요.
-      맨 위 동그라미(○)가 남은 일이에요. 다 채우고 <b>발행</b>을 고른 뒤 아래 <b>GitHub 에 발행</b>을 누르면 몇 분 뒤 사이트에 올라갑니다.
+      목록에서 사료를 누르면 상세로 들어가요. <b>왼쪽에서 채우고, 오른쪽 미리보기</b>로 사이트에 어떻게 보일지 확인하세요.
+      다 채우고 <b>발행</b>을 고른 뒤 아래 <b>GitHub 에 발행</b>을 누르면 몇 분 뒤 사이트에 올라갑니다.
     </div>
     <div class="stat">
       <div><b>${s.total}</b><span>전체</span></div>
       <div><b style="color:var(--good)">${s.ready}</b><span>발행 후보</span></div>
       <div><b style="color:var(--bad)">${s.blocked}</b><span>보류${s.pricePending?` (가격 ${s.pricePending})`:''}</span></div>
     </div>
-    ${DATA.batches.map(b=>`<div class="batch">
-      <h2>${esc(b.file)}${b.collectedAt?' · 수집 '+esc(b.collectedAt.slice(0,10)):''}</h2>
-      ${b.items.map(card).join('')}
-    </div>`).join('')}`;
+    ${listHtml()}`;
+  }
   document.getElementById('bar').hidden=false;
   updateBar();
 }
+/* 목록 조작 — 검색·필터·정렬·열기. 상세의 입력 처리는 아래 기존 핸들러가 그대로 맡는다. */
+let lqTimer;
+document.addEventListener('input',e=>{
+  if(e.target.id!=='lq')return;
+  clearTimeout(lqTimer);
+  lqTimer=setTimeout(()=>{
+    VIEW.q=e.target.value;saveView();
+    const pos=e.target.selectionStart;render();
+    const q=document.getElementById('lq');if(q){q.focus();q.setSelectionRange(pos,pos);}
+  },150);
+});
+document.addEventListener('click',e=>{
+  const fb=e.target.closest('[data-filter]');
+  if(fb){VIEW.f=fb.dataset.filter;saveView();render();return;}
+  const th=e.target.closest('th[data-sort]');
+  if(th){const k=th.dataset.sort;VIEW.dir=VIEW.sort===k?-VIEW.dir:1;VIEW.sort=k;saveView();render();return;}
+  const row=e.target.closest('tr[data-open]');
+  if(row){location.hash='#/'+encodeURIComponent(row.dataset.open);return;}
+  if(e.target.closest('[data-back]')){location.hash='';return;}
+  const go=e.target.closest('[data-go]');
+  if(go&&go.dataset.go){location.hash='#/'+encodeURIComponent(go.dataset.go);return;}
+});
+window.addEventListener('hashchange',()=>{if(DATA){render();window.scrollTo(0,0);}});
 
 function updateBar(){
   const pub=Object.values(decision).filter(v=>v==='publish').length;
@@ -1398,7 +1552,7 @@ document.addEventListener('click',e=>{
   }
 
   const hd=e.target.closest('.hd');
-  if(hd){hd.closest('.card').classList.toggle('open');return;}
+  if(hd){if(!hd.closest('.detail'))hd.closest('.card').classList.toggle('open');return;}
 
   const btn=e.target.closest('.act button');
   if(btn&&!btn.disabled){
