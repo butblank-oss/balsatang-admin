@@ -797,7 +797,9 @@ function todoList(it){
   return [
     ['사진', !!m.thumb],
     ['원료', (m.ingredients||[]).length>0],
-    ['성분표', ['protein','fat','fiber','moisture'].every(k=>ga[k]!=null), '수분 등'],
+    /* 건물기준(gaDm)만 공개된 처방식(힐스 한국 공식)은 그 네 값이 있으면 성분표가 찬 것이다 (2026-10-12) */
+    ['성분표', ['protein','fat','fiber','moisture'].every(k=>ga[k]!=null)
+      || (m.rx===true&&!m.ga&&['protein','fat','fiber','carb'].every(k=>m.gaDm?.[k]!=null)), '수분 등'],
     ['가격', m.price?.p>0&&m.price?.wg>0],
     ['판매 용량', (m.price?.wgOptions||m.wgOptionsHint||[]).length>0],
     ['구매 링크', !!m.price?.buyUrl]
@@ -805,8 +807,11 @@ function todoList(it){
 }
 const todoLeft=it=>todoList(it).filter(([,ok])=>!ok).length;
 function todoHtml(it){
+  /* 건물기준 값은 아래 성분 입력칸(봉투 기준)에 넣을 수 없으니 여기서 읽기 전용으로 보여 준다 */
+  const dm=merged(it).proposed.gaDm;
+  const dmLine=dm?`<div class="t-caption" style="margin-top:6px">건물기준(제조사 공개) · 단백질 ${esc(dm.protein??'—')}% · 지방 ${esc(dm.fat??'—')}% · 탄수 ${esc(dm.carb??'—')}% · 조섬유 ${esc(dm.fiber??'—')}%</div>`:'';
   return `<div class="todo">${todoList(it).map(([l,ok])=>
-    `<span class="${ok?'ok':'no'}">${ok?'✓':'○'} ${esc(l)}</span>`).join('')}</div>`;
+    `<span class="${ok?'ok':'no'}">${ok?'✓':'○'} ${esc(l)}</span>`).join('')}</div>${dmLine}`;
 }
 
 /* ── ⑤ 소비자에게 보이는 문구 ──
