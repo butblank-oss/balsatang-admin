@@ -223,7 +223,7 @@ const PUB = {
     p.ratings = {
       ...p.ratings,
       ...ENGINE.rateAll({
-        dmCarb: p.facts.dmCarb, protein: p.facts.protein,
+        dmCarb: p.facts.dmCarb, protein: p.facts.protein, moisture: p.ga?.moisture ?? null,
         firstIngrCat: p.facts.firstIngrCat,
         cautionN: p.facts.cautionN, dangerN: p.facts.dangerN,
         pKg: pending ? null : (p.price?.pKg ?? null)

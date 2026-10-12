@@ -614,7 +614,7 @@ function renderRate(f) {
   const box = $('#rateOut'); if (!box) return;
   const d = detailOf(f), n = d.nutrient || {}, dist = d.dist || {};
   const next = ENGINE.rateAll({
-    dmCarb: n.dmCarb, protein: n.protein,
+    dmCarb: n.dmCarb, protein: n.protein, moisture: n.moisture,
     firstIngrCat: (d.ingr || [])[0]?.cat ?? null,
     cautionN: dist.caution, dangerN: dist.danger, pKg: f.price?.pKg ?? null
   });
@@ -893,7 +893,7 @@ function serialize() {
     if (f.__reScore) {
       const d = S.detail[f.id] || {}, n = d.nutrient || {}, dist = d.dist || {};
       const next = ENGINE.rateAll({
-        dmCarb: n.dmCarb, protein: n.protein,
+        dmCarb: n.dmCarb, protein: n.protein, moisture: n.moisture,
         firstIngrCat: (d.ingr || [])[0]?.cat ?? null,
         cautionN: dist.caution, dangerN: dist.danger, pKg: c.price?.pKg ?? null
       });

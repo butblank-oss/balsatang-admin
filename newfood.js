@@ -196,7 +196,7 @@ const NEWFOOD = {
       firstIngrCat: ingr[0]?.cat ?? null,
       cautionN: dist.caution, dangerN: dist.danger, pKg
     };
-    const ratings = ENGINE.rateAll(facts);
+    const ratings = ENGINE.rateAll({ ...facts, moisture: ga.moisture });
     const score = Object.values(ratings).every(v => v != null) ? ENGINE.computeScore(ratings) : null;
     const { fit } = ENGINE.deriveFit({ nutrient, ingr, dist, funcIngr });
     return { ga, list, ingr, dist, funcIngr, nutrient, facts, ratings, score, pKg, prices,
