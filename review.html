@@ -82,7 +82,10 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
 .pv-score span{font-size:10.5px;color:var(--muted)}
 .pv-stars{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-top:10px;font-size:12px}
 .pv-stars div{display:flex;justify-content:space-between}
-.pv-stars i{font-style:normal;color:#E0A100;letter-spacing:1px}
+/* 별은 사이트와 같은 보라다. 금색(#E0A100)이었는데 흰 배경에서 2.27:1 — 심사자가
+   별 개수를 세는 자리인데 글자가 안 읽혔다. 게다가 이 칸 이름이 '프론트 미리보기' 인데
+   사이트 별은 보라라서, 금색은 대비도 틀리고 미리보기로도 거짓이었다. 보라는 11.68:1. */
+.pv-stars i{font-style:normal;color:#5F0080;letter-spacing:1px}
 .pv-stars i.na{color:var(--muted);letter-spacing:0}
 .pv-price{margin-top:8px;font-size:12.5px;color:var(--sub)}
 .pv-price b{color:var(--ink)}
